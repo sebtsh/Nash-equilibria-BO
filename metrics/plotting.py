@@ -45,7 +45,7 @@ def plot_utilities_2d(u,
     fig.colorbar(im1, ax=ax1)
 
     im2 = ax2.imshow(u2_reshaped,
-                     interpolation='nearest',
+                     interpolation='None',
                      extent=(xmin, xmax, ymin, ymax),
                      origin='lower',
                      cmap=cmap,
@@ -88,7 +88,7 @@ def plot_func_2d(f,
     fig.set_dpi(200)
 
     im1 = ax1.imshow(f_reshaped,
-                     interpolation='nearest',
+                     interpolation='None',
                      extent=(xmin, xmax, ymin, ymax),
                      origin='lower',
                      cmap=cmap,

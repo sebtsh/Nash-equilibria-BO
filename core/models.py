@@ -27,4 +27,3 @@ def create_models(data,
     return [gpf.models.GPR(data=slice_agent_data(data, i),
                            kernel=kernel,
                            noise_variance=noise_variance) for i in range(num_agents)]
-

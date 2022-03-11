@@ -46,3 +46,9 @@ def merge_data(data1,
     X_new = np.concatenate((X_1, X_2), axis=0)
     Y_new = np.concatenate((Y_1, Y_2), axis=0)
     return X_new, Y_new
+
+
+def arr_index(array, item):
+    for idx, val in enumerate(array):
+        if np.allclose(val, item):
+            return idx
