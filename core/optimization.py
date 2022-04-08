@@ -4,17 +4,19 @@ from core.models import create_models
 from metrics.plotting import plot_models_2d
 
 
-def bo_loop(init_data,
-            observer,
-            models,
-            acquisition,
-            num_iters,
-            kernel,
-            noise_variance,
-            actions,
-            domain,
-            plot=False,
-            save_dir=""):
+def bo_loop(
+    init_data,
+    observer,
+    models,
+    acquisition,
+    num_iters,
+    kernel,
+    noise_variance,
+    actions,
+    domain,
+    plot=False,
+    save_dir="",
+):
     """
     Main Bayesian optimization loop.
     :param init_data: Tuple (X, Y), X and Y are arrays of shape (n, N).
@@ -36,21 +38,21 @@ def bo_loop(init_data,
         X_new = acquisition(models)  # (n, N)
         y_new = observer(X_new)
         data = merge_data(data, (X_new, y_new))
-        models = create_models(data=data,
-                               kernel=kernel,
-                               noise_variance=noise_variance)
+        models = create_models(data=data, kernel=kernel, noise_variance=noise_variance)
         if plot:
-            plot_models_2d(models=models,
-                           xlims=(0, 1),
-                           ylims=(0, 1),
-                           actions=actions,
-                           domain=domain,
-                           X=data[0][t:t+1],
-                           title=f"GPs iter {t}",
-                           cmap="Spectral",
-                           save=True,
-                           save_dir=save_dir,
-                           filename=f"gps_{t}",
-                           show_plot=False)
+            plot_models_2d(
+                models=models,
+                xlims=(0, 1),
+                ylims=(0, 1),
+                actions=actions,
+                domain=domain,
+                X=data[0][t : t + 1],
+                title=f"GPs iter {t}",
+                cmap="Spectral",
+                save=True,
+                save_dir=save_dir,
+                filename=f"gps_{t}",
+                show_plot=False,
+            )
 
     return data

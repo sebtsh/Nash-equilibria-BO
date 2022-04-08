@@ -1,10 +1,7 @@
 import numpy as np
 
 
-def best_response_payoff_pure(u,
-                              S,
-                              actions,
-                              response_dicts):
+def best_response_payoff_pure(u, S, actions, response_dicts):
     """
     Calculates the best response payoff for each pure strategy profile in S, for each agent. As currently implemented,
     O(M^2N^2) operation.
@@ -16,8 +13,8 @@ def best_response_payoff_pure(u,
     """
     M = len(actions)
     _, N = S.shape
-    brp = np.zeros((M ** N, N))
-    all_utils = np.zeros((M ** N, N))
+    brp = np.zeros((M**N, N))
+    all_utils = np.zeros((M**N, N))
     for j in range(N):
         all_utils[:, j] = np.squeeze(u[j](S), axis=-1)
 
@@ -33,11 +30,7 @@ def best_response_payoff_pure(u,
     return brp
 
 
-def ucb_f(all_ucb,
-          all_lcb,
-          S,
-          actions,
-          response_dicts):
+def ucb_f(all_ucb, all_lcb, S, actions, response_dicts):
     """
     Calculates the upper confidence bound of the negative best response payoff for each pure strategy profile in S, for
     each agent.
@@ -50,7 +43,7 @@ def ucb_f(all_ucb,
     """
     M = len(actions)
     _, N = S.shape
-    ucb_f_vals = np.zeros((M ** N, N))
+    ucb_f_vals = np.zeros((M**N, N))
 
     for i in range(len(S)):
         s = S[i]

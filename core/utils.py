@@ -16,9 +16,7 @@ def cross_product(x, y):
     return np.concatenate([x_temp, y_temp], axis=-1)
 
 
-def join_action(s,
-                i,
-                actions):
+def join_action(s, i, actions):
     """
     Given a strategy profile s, fixes the actions of all other agents, and replaces the action of the i-th agent
     with all possible actions.
@@ -33,8 +31,7 @@ def join_action(s,
     return joined
 
 
-def merge_data(data1,
-               data2):
+def merge_data(data1, data2):
     """
     Joins two datasets represented as tuples (X, Y).
     :param data1: Tuple of 2 arrays of shape (n, N).
@@ -54,9 +51,7 @@ def arr_index(array, item):
             return idx
 
 
-def all_equal_except_i(s1,
-                       s2,
-                       i):
+def all_equal_except_i(s1, s2, i):
     N = len(s1)
     is_all_equal = True
     for j in range(N):
@@ -65,8 +60,7 @@ def all_equal_except_i(s1,
     return is_all_equal
 
 
-def create_response_dict(domain,
-                         i):
+def create_response_dict(domain, i):
     """
     Creates a dictionary with keys that are the bytes of a length N array, and returns the idxs of domain that have
     the actions of all other agents except i the same.
@@ -83,3 +77,8 @@ def create_response_dict(domain,
                 idxs.append(idx)
         dic[s.tobytes()] = idxs
     return dic
+
+
+def unif_in_simplex(n, rng):
+    k = rng.exponential(scale=1.0, size=n)
+    return k / sum(k)

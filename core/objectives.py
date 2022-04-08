@@ -1,12 +1,7 @@
 import numpy as np
 
 
-def sample_GP_prior(kernel,
-                    lowers,
-                    uppers,
-                    num_points,
-                    rng,
-                    jitter=1e-06):
+def sample_GP_prior(kernel, lowers, uppers, num_points, rng, jitter=1e-06):
     """
     Sample a random function from a GP prior with mean 0 and covariance specified by a kernel.
     :param kernel: a GPflow kernel.
@@ -27,12 +22,7 @@ def sample_GP_prior(kernel,
     return lambda x: kernel(x, points) @ K_inv_f
 
 
-def sample_GP_prior_utilities(num_agents,
-                              kernel,
-                              lowers,
-                              uppers,
-                              num_points,
-                              rng):
+def sample_GP_prior_utilities(num_agents, kernel, lowers, uppers, num_points, rng):
     """
     Creates agent utilities represented as a list of functions.
     :param num_agents: int.
@@ -43,16 +33,13 @@ def sample_GP_prior_utilities(num_agents,
     :param rng: NumPy rng object.
     :return: List of Callables that take in an array of shape (n, N) and return an array of shape (n, 1).
     """
-    return [sample_GP_prior(kernel,
-                            lowers,
-                            uppers,
-                            num_points,
-                            rng) for _ in range(num_agents)]
+    return [
+        sample_GP_prior(kernel, lowers, uppers, num_points, rng)
+        for _ in range(num_agents)
+    ]
 
 
-def noisy_observer(u,
-                   noise_variance,
-                   rng):
+def noisy_observer(u, noise_variance, rng):
     """
     Creates a list of functions that take in a strategy and return the noisy utility value for that agent.
     :param u: List of N Callables that each take in an array of shape (n, N) and return an array of shape (n, 1).
@@ -60,11 +47,14 @@ def noisy_observer(u,
     :param rng: NumPy rng object.
     :return: Callable that takes in an array of shape (n, N) and returns an array of shape (n, N).
     """
+
     def observer(X):
         n, N = X.shape
         Y = np.zeros((n, N))
         for i in range(N):
-            Y[:, i] = np.squeeze(u[i](X) + rng.normal(0, noise_variance, (n, 1)), axis=-1)
+            Y[:, i] = np.squeeze(
+                u[i](X) + rng.normal(0, noise_variance, (n, 1)), axis=-1
+            )
         return Y
 
     return observer
