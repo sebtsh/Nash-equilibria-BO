@@ -37,8 +37,8 @@ def merge_data(data1,
                data2):
     """
     Joins two datasets represented as tuples (X, Y).
-    :param data1: Array of shape (n, N).
-    :param data2: Array of shape (m, N).
+    :param data1: Tuple of 2 arrays of shape (n, N).
+    :param data2: Tuple of 2 arrays of shape (m, N).
     :return: Array of shape (n + m, N).
     """
     X_1, Y_1 = data1
@@ -52,3 +52,34 @@ def arr_index(array, item):
     for idx, val in enumerate(array):
         if np.allclose(val, item):
             return idx
+
+
+def all_equal_except_i(s1,
+                       s2,
+                       i):
+    N = len(s1)
+    is_all_equal = True
+    for j in range(N):
+        if j != i and s1[j] != s2[j]:
+            is_all_equal = False
+    return is_all_equal
+
+
+def create_response_dict(domain,
+                         i):
+    """
+    Creates a dictionary with keys that are the bytes of a length N array, and returns the idxs of domain that have
+    the actions of all other agents except i the same.
+    :param domain: array of shape (M ** N, N).
+    :param i: int.
+    :return: dict.
+    """
+    _, N = domain.shape
+    dic = {}
+    for s in domain:
+        idxs = []
+        for idx, t in enumerate(domain):
+            if all_equal_except_i(s, t, i):
+                idxs.append(idx)
+        dic[s.tobytes()] = idxs
+    return dic

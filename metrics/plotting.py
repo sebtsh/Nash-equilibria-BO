@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
 from pathlib import Path
+
+from core.ne import best_response_payoff_pure
 
 
 def plot_utilities_2d(u,
@@ -9,6 +10,7 @@ def plot_utilities_2d(u,
                       ylims,
                       actions,
                       domain,
+                      response_dicts,
                       title="",
                       cmap="Spectral",
                       save=False,
@@ -28,6 +30,14 @@ def plot_utilities_2d(u,
     u2_reshaped = np.transpose(
         np.reshape(u2_vals, [num_actions, num_actions]))
 
+    brp = best_response_payoff_pure(u=u,
+                                    S=domain,
+                                    actions=actions,
+                                    response_dicts=response_dicts)  # array of shape (M ** N, N)
+    nne_idx = np.argmin(np.max(brp, axis=-1))
+    nne = domain[nne_idx:nne_idx+1]
+
+    offset = (1 / num_actions) / 2
     fig, (ax1, ax2) = plt.subplots(1, 2)
     fig.suptitle(title, size=20)
     fig.set_size_inches(8, 4)
@@ -35,24 +45,26 @@ def plot_utilities_2d(u,
 
     im1 = ax1.imshow(u1_reshaped,
                      interpolation='nearest',
-                     extent=(xmin, xmax, ymin, ymax),
+                     extent=(xmin - offset, xmax + offset, ymin - offset, ymax + offset),
                      origin='lower',
                      cmap=cmap,
                      aspect=(xmax - xmin) / (ymax - ymin))
     ax1.set_title("Agent 1 utility", size=16)
     ax1.set_xlabel(xlabel, size=12)
     ax1.set_ylabel(ylabel, size=12)
+    ax1.plot(nne[:, 0], nne[:, 1], '*', markersize=10, c='white')
     fig.colorbar(im1, ax=ax1)
 
     im2 = ax2.imshow(u2_reshaped,
                      interpolation='None',
-                     extent=(xmin, xmax, ymin, ymax),
+                     extent=(xmin - offset, xmax + offset, ymin - offset, ymax + offset),
                      origin='lower',
                      cmap=cmap,
                      aspect=(xmax - xmin) / (ymax - ymin))
     ax2.set_title("Agent 2 utility", size=16)
     ax2.set_xlabel(xlabel, size=12)
     ax2.set_ylabel(ylabel, size=12)
+    ax2.plot(nne[:, 0], nne[:, 1], '*', markersize=10, c='white')
     fig.colorbar(im2, ax=ax2)
 
     fig.tight_layout()
@@ -82,6 +94,7 @@ def plot_func_2d(f,
     f_reshaped = np.transpose(
         np.reshape(f, [num_actions, num_actions]))  # f needs to have shape (num_actions ** 2) or (num_actions ** 2, 1)
 
+    offset = (1 / num_actions) / 2
     fig, (ax1) = plt.subplots(1, 1)
     fig.suptitle(title, size=12)
     fig.set_size_inches(6, 3)
@@ -89,7 +102,7 @@ def plot_func_2d(f,
 
     im1 = ax1.imshow(f_reshaped,
                      interpolation='None',
-                     extent=(xmin, xmax, ymin, ymax),
+                     extent=(xmin - offset, xmax + offset, ymin - offset, ymax + offset),
                      origin='lower',
                      cmap=cmap,
                      aspect=(xmax - xmin) / (ymax - ymin))
@@ -169,6 +182,30 @@ def plot_models_2d(models,
             ax.set_xlabel(xlabel, size=8)
             ax.set_ylabel(ylabel, size=8)
             fig.colorbar(im, ax=ax)
+
+    fig.tight_layout()
+    if save:
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_dir + filename, bbox_inches='tight')
+    if show_plot:
+        plt.show()
+
+
+def plot_regret(regret,
+                num_iters,
+                title="",
+                save=False,
+                save_dir="",
+                filename="",
+                show_plot=False):
+
+    fig, (ax1) = plt.subplots(1, 1)
+    fig.suptitle(title, size=12)
+    fig.set_size_inches(12, 6)
+    fig.set_dpi(200)
+
+    ax1.plot(np.arange(num_iters), regret)
+    ax1.axhline(y=0, xmax=num_iters, color='grey', alpha=0.5, linestyle='--')
 
     fig.tight_layout()
     if save:
