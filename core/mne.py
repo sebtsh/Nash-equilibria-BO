@@ -1,12 +1,39 @@
 import numpy as np
+from scipy.optimize import minimize
+
 from core.utils import unif_in_simplex
+
+
+def tgs_var_utility(init_points, constraints, bounds):
+    """
+    Runs the variable utility nonlinear feasibility problem on an array of initial points to find potential MNEs.
+    :param init_points: array of shape (c, M1 + M2 + 2 + 2*(M1 + M2)).
+    :param constraints: Tuple of constraint dicts.
+    :param bounds: Tuple of bounds pairs.
+    :return: (True, parameters) if a feasible set of parameters is found. Otherwise, returns (False, None).
+    """
+    fun = lambda x: 0  # feasibility problem
+
+    for x0 in init_points:
+        res = minimize(
+            fun=fun,
+            x0=x0,
+            method="SLSQP",
+            bounds=bounds,
+            constraints=constraints,
+            options={"disp": False},
+        )
+        if res.success:
+            return True, res.x
+
+    return False, None
 
 
 def build_init_points(
     M1, M2, s1, s2, U1upper, U1lower, U2upper, U2lower, num_rand_dists_per_agent, rng
 ):
     """
-
+    Constructs an array of initial points for the nonlinear feasibility problem.
     :param M1: int. Total number of actions for player 1.
     :param M2: int. Total number of actions for player 2.
     :param s1: 1-D array with length from 1 to M. Indices of actions in agent 1's support, ints from 0 - M-1.
