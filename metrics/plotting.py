@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from core.ne import best_response_payoff_pure
+from core.pne import best_response_payoff_pure
 
 
 def plot_utilities_2d(

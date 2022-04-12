@@ -1,3 +1,4 @@
+from itertools import chain, combinations
 import numpy as np
 
 
@@ -82,3 +83,17 @@ def create_response_dict(domain, i):
 def unif_in_simplex(n, rng):
     k = rng.exponential(scale=1.0, size=n)
     return k / sum(k)
+
+
+def sort_size_balance(pairs):
+    inter = sorted(pairs, key=lambda x: x[0] + x[1])
+    return sorted(inter, key=lambda x: abs(x[0] - x[1]))
+
+
+def all_subset_actions(actions):
+    def powerset(iterable):
+        "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+        s = list(iterable)
+        return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+
+    return list(powerset(actions))[1:]

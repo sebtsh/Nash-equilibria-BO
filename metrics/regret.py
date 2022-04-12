@@ -1,6 +1,6 @@
 import numpy as np
 
-from core.ne import best_response_payoff_pure
+from core.pne import best_response_payoff_pure
 from core.utils import arr_index
 
 

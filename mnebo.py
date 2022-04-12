@@ -14,12 +14,12 @@ acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
 seed = 0
 num_agents = 2
 num_actions = 8
-ls = np.array([0.2] * num_agents)
+ls = np.array([0.25] * num_agents)
 lowers = [0.0] * num_agents
 uppers = [1.0] * num_agents
 noise_variance = 0.1
 num_init_points = 2
-num_iters = 100
+num_iters = 800
 beta = 2.0
 plot_utils = False
 dir = "results/test/"
@@ -62,77 +62,3 @@ init_X = domain[init_idxs]
 init_data = (init_X, observer(init_X))
 
 models = create_models(data=init_data, kernel=kernel, noise_variance=noise_variance)
-
-acq_func = get_acquisition(
-    acq_name=acq_name,
-    beta=beta,
-    domain=domain,
-    actions=actions,
-    response_dicts=response_dicts,
-)
-
-final_data = bo_loop(
-    init_data=init_data,
-    observer=observer,
-    models=models,
-    acquisition=acq_func,
-    num_iters=num_iters,
-    kernel=kernel,
-    noise_variance=noise_variance,
-    actions=actions,
-    domain=domain,
-    plot=plot_utils,
-    save_dir=utils_save_dir,
-)
-
-final_data_minus_init = (
-    final_data[0][num_init_points:],
-    final_data[1][num_init_points:],
-)
-imm_regret, cumu_regret = calc_regret(
-    u=u,
-    data=final_data_minus_init,
-    domain=domain,
-    actions=actions,
-    response_dicts=response_dicts,
-)
-
-regrets_save_dir = dir + "regrets/"
-
-plot_regret(
-    regret=imm_regret,
-    num_iters=num_iters * (num_agents + 1),
-    title="Immediate regret (all samples)",
-    save=True,
-    save_dir=regrets_save_dir,
-    filename="imm-all",
-)
-# plot_regret(regret=cumu_regret,
-#             num_iters=num_iters * (num_agents + 1),
-#             title='Cumulative regret (all samples)',
-#             save=True,
-#             save_dir=regrets_save_dir,
-#             filename='cumu-all')
-
-noreg_seq = np.array([j * (num_agents + 1) for j in range(num_iters)], dtype=np.int32)
-plot_regret(
-    regret=imm_regret[noreg_seq],
-    num_iters=num_iters,
-    title="Immediate regret (no-regret sequence)",
-    save=True,
-    save_dir=regrets_save_dir,
-    filename="imm-noregseq",
-)
-# plot_regret(regret=cumu_regret[noreg_seq],
-#             num_iters=num_iters,
-#             title='Cumulative regret (no-regret sequence)',
-#             save=True,
-#             save_dir=regrets_save_dir,
-#             filename='cumu-noregseq')
-
-# print("Regrets of all samples")
-# print(imm_regret)
-# print(cumu_regret)
-# print("Regrets of no-regret sequence")
-# print(imm_regret[noreg_seq])
-# print(cumu_regret[noreg_seq])
