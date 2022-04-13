@@ -4,9 +4,9 @@ import gpflow as gpf
 from core.objectives import sample_GP_prior_utilities, noisy_observer
 from core.models import create_models
 from core.utils import cross_product, create_response_dict
-from core.optimization import bo_loop
+from core.optimization import bo_loop_pne
 from core.acquisitions import get_acquisition
-from metrics.regret import calc_regret
+from metrics.regret import calc_regret_pne
 from metrics.plotting import plot_utilities_2d, plot_regret
 
 # Parameters
@@ -19,9 +19,9 @@ lowers = [0.0] * num_agents
 uppers = [1.0] * num_agents
 noise_variance = 0.1
 num_init_points = 2
-num_iters = 100
+num_iters = 50
 beta = 2.0
-plot_utils = False
+plot_utils = True
 dir = "results/test/"
 rng = np.random.default_rng(seed)
 tf.random.set_seed(seed)
@@ -41,8 +41,8 @@ if plot_utils:
     utils_save_dir = dir + "gif/"
     plot_utilities_2d(
         u=u,
-        xlims=(lowers[0], uppers[0]),
-        ylims=(lowers[1], uppers[1]),
+        xlims=(lowers[1], uppers[1]),
+        ylims=(lowers[0], uppers[0]),
         actions=actions,
         domain=domain,
         response_dicts=response_dicts,
@@ -51,7 +51,7 @@ if plot_utils:
         save=True,
         save_dir=utils_save_dir,
         filename="utilities",
-        show_plot=False,
+        show_plot=True,
     )
 else:
     utils_save_dir = ""
@@ -71,7 +71,7 @@ acq_func = get_acquisition(
     response_dicts=response_dicts,
 )
 
-final_data = bo_loop(
+final_data = bo_loop_pne(
     init_data=init_data,
     observer=observer,
     models=models,
@@ -89,7 +89,7 @@ final_data_minus_init = (
     final_data[0][num_init_points:],
     final_data[1][num_init_points:],
 )
-imm_regret, cumu_regret = calc_regret(
+imm_regret, cumu_regret = calc_regret_pne(
     u=u,
     data=final_data_minus_init,
     domain=domain,
@@ -123,16 +123,18 @@ plot_regret(
     save_dir=regrets_save_dir,
     filename="imm-noregseq",
 )
-# plot_regret(regret=cumu_regret[noreg_seq],
-#             num_iters=num_iters,
-#             title='Cumulative regret (no-regret sequence)',
-#             save=True,
-#             save_dir=regrets_save_dir,
-#             filename='cumu-noregseq')
+plot_regret(
+    regret=cumu_regret[noreg_seq],
+    num_iters=num_iters,
+    title="Cumulative regret (no-regret sequence)",
+    save=True,
+    save_dir=regrets_save_dir,
+    filename="cumu-noregseq",
+)
 
-# print("Regrets of all samples")
-# print(imm_regret)
-# print(cumu_regret)
-# print("Regrets of no-regret sequence")
-# print(imm_regret[noreg_seq])
-# print(cumu_regret[noreg_seq])
+print("Regrets of all samples")
+print(imm_regret)
+print(cumu_regret)
+print("Regrets of no-regret sequence")
+print(imm_regret[noreg_seq])
+print(cumu_regret[noreg_seq])

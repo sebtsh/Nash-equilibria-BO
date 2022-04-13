@@ -8,6 +8,7 @@ from core.mne import (
     tgs_var_utility,
     SEM,
     SEM_var_utility,
+    get_strategies_and_support,
 )
 
 rng = np.random.default_rng(0)
@@ -20,14 +21,14 @@ U1lower = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) - 0.2
 U2upper = np.array([[2.1, 0.0], [0.0, 2.0], [6.1, 3.0]]) + 0.2
 U2lower = np.array([[2.1, 0.0], [0.0, 2.0], [5.1, 3.0]]) - 0.2
 
-print("U1upper")
-print(U1upper)
-print("U1lower")
-print(U1lower)
-print("U2upper")
-print(U2upper)
-print("U2lower")
-print(U2lower)
+# print("U1upper")
+# print(U1upper)
+# print("U1lower")
+# print(U1lower)
+# print("U2upper")
+# print(U2upper)
+# print("U2lower")
+# print(U2lower)
 
 # from core.utils import sort_size_balance
 # import itertools
@@ -61,11 +62,19 @@ print(U2lower)
 #             print("=======")
 
 all_res = SEM_var_utility(
-    M1, M2, U1upper, U1lower, U2upper, U2lower, num_rand_dists_per_agent=5, rng=rng
+    U1upper,
+    U1lower,
+    U2upper,
+    U2lower,
+    num_rand_dists_per_agent=5,
+    rng=rng,
+    mode="all",
 )
 u1start = M1 + M2 + 2
 u2start = u1start + M1 * M2
 for res in all_res:
+    (s1, s2), (a1supp, a2supp) = get_strategies_and_support(res, M1, M2)
+    print((s1, s2), (a1supp, a2supp))
     print(f"Agent 1 strategy: {res[:M1]}, with value {res[M1]}")
     print(f"Agent 2 strategy: {res[M1 + 1:M1 + M2 + 1]}, with value {res[M1 + M2 + 1]}")
     print(f"U1: {np.reshape(res[u1start:u1start + M1 * M2], (M1, M2))}")

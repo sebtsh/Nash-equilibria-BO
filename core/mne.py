@@ -5,13 +5,46 @@ from scipy.optimize import minimize
 from core.utils import unif_in_simplex, sort_size_balance
 
 
+def get_strategies_and_support(x, M1, M2):
+    """
+    Takes the output of SEM_var_utility, an MNE represented as an array, and extracts the strategies and support of the
+    two agents.
+    :param x: array of length M1 + M2 + 2 + 2 * (M1 * M2)
+    :param M1: Agent 1 number of actions.
+    :param M2: Agent 2 number of actions.
+    :return: Tuple (agent 1 strategy, agent 2 strategy), Tuple (agent 1 support, agent 2 support)
+    """
+    s1 = x[:M1]
+    s2 = x[M1 + 1 : M1 + M2 + 1]
+    a1support = np.where(np.isclose(np.zeros(M1), s1) == False)[0]
+    a2support = np.where(np.isclose(np.zeros(M2), s2) == False)[0]
+
+    return (s1, s2), (a1support, a2support)
+
+
+def neg_brp_mixed(U1, U2, s):
+    """
+    Computes the negative best response payoff for each agent for a given mixed strategy profile.
+    :param U1: Array of shape (M1, M2). Agent 1's utility matrix. Agent 1 row player, agent 2 column player.
+    :param U2: Array of shape (M1, M2). Agent 2's utility matrix. Agent 1 row player, agent 2 column player.
+    :param s: Tuple (agent 1 strategy, agent 2 strategy). Each strategy is an array of length M1 or M2.
+    :return: Tuple (agent 1 -brp, agent 2 -brp).
+    """
+    a1_expected_utility = s[0] @ U1 @ s[1]
+    a1_best_response = np.max(U1 @ s[1])
+    a2_expected_utility = s[0] @ U2 @ s[1]
+    a2_best_response = np.max(s[0] @ U2)
+    return (
+        a1_expected_utility - a1_best_response,
+        a2_expected_utility - a2_best_response,
+    )
+
+
 def SEM_var_utility(
-    M1, M2, U1upper, U1lower, U2upper, U2lower, num_rand_dists_per_agent, rng
+    U1upper, U1lower, U2upper, U2lower, num_rand_dists_per_agent, rng, mode
 ):
     """
     Runs the support-enumeration method (SEM) to find all mixed NEs.
-    :param M1: int. Number of actions for player 1.
-    :param M2: int. Number of actions for player 2.
     :param U1upper: Array of shape (M1, M2). Agent 1's upper bound utility matrix. Agent 1 row player, agent 2 column
     player.
     :param U1lower: Array of shape (M1, M2). Agent 1's lower bound utility matrix. Agent 1 row player, agent 2 column
@@ -22,11 +55,14 @@ def SEM_var_utility(
     player.
     :param num_rand_dists_per_agent: int.
     :param rng: NumPy rng object.
+    :param mode: str. Either 'all' or 'first'.
     :return: list of all MNEs.
     """
+    M1, M2 = U1upper.shape
     pairs = [(x, y) for x in range(1, M1 + 1) for y in range(1, M2 + 1)]
     sorted_pairs = sort_size_balance(pairs)
     mnes = []
+    is_found = False
     for pair in sorted_pairs:
         s1_size, s2_size = pair
         all_s1 = itertools.combinations(np.arange(M1), s1_size)
@@ -35,8 +71,8 @@ def SEM_var_utility(
             A2 = np.setdiff1d(
                 np.arange(M2),
                 conditionally_dominated_var_utility(
-                    p1actions=s1,
-                    p2actions=np.arange(M2),
+                    a1actions=s1,
+                    a2actions=np.arange(M2),
                     active_agent=2,
                     U1upper=U1upper,
                     U1lower=U1lower,
@@ -47,8 +83,8 @@ def SEM_var_utility(
             if (
                 len(
                     conditionally_dominated_var_utility(
-                        p1actions=s1,
-                        p2actions=A2,
+                        a1actions=s1,
+                        a2actions=A2,
                         active_agent=1,
                         U1upper=U1upper,
                         U1lower=U1lower,
@@ -64,8 +100,8 @@ def SEM_var_utility(
                     if (
                         len(
                             conditionally_dominated_var_utility(
-                                p1actions=s1,
-                                p2actions=s2,
+                                a1actions=s1,
+                                a2actions=s2,
                                 active_agent=1,
                                 U1upper=U1upper,
                                 U1lower=U1lower,
@@ -75,10 +111,8 @@ def SEM_var_utility(
                         )
                         == 0
                     ):  # if true, run TGS
-                        print(f"reached TGS for s1:{s1}, s2:{s2}")
+                        # print(f"reached TGS for s1:{s1}, s2:{s2}")
                         cons, bounds = build_tgs_constraints_var_utility(
-                            M1=M1,
-                            M2=M2,
                             s1=s1,
                             s2=s2,
                             U1upper=U1upper,
@@ -88,8 +122,6 @@ def SEM_var_utility(
                         )
 
                         init_points = build_init_points(
-                            M1=M1,
-                            M2=M2,
                             s1=s1,
                             s2=s2,
                             U1upper=U1upper,
@@ -105,20 +137,27 @@ def SEM_var_utility(
                         )
                         if success:
                             mnes.append(res)
+                            if mode == "first":
+                                is_found = True
+                                break
+            if mode == "first" and is_found:
+                break
+        if mode == "first" and is_found:
+            break
     return mnes
 
 
 def conditionally_dominated_var_utility(
-    p1actions, p2actions, active_agent, U1upper, U1lower, U2upper, U2lower
+    a1actions, a2actions, active_agent, U1upper, U1lower, U2upper, U2lower
 ):
     """
     Determines which actions of the active player are conditionally dominated given the action set of the other player.
     Takes an optimistic approach in which an action is only conditionally dominated if another of that player's action's
     lower bounds are all higher than the first action's upper bounds.
-    :param p1actions: 1-D array.
-    :param p2actions: 1-D array.
-    :param active_agent: Either 1 or 2. Indicates the player whose actions will be determined to be dominated
-    conditioned on the other player's actions.
+    :param a1actions: 1-D array.
+    :param a2actions: 1-D array.
+    :param active_agent: Either 1 or 2. Indicates the agent whose actions will be determined to be dominated
+    conditioned on the other agent's actions.
     :param U1upper: Array of shape (M1, M2). Agent 1's upper bound utility matrix. Agent 1 row player, agent 2 column
     player.
     :param U1lower: Array of shape (M1, M2). Agent 1's lower bound utility matrix. Agent 1 row player, agent 2 column
@@ -130,32 +169,31 @@ def conditionally_dominated_var_utility(
     :return: 1-D array of indices of actions of the active player that are conditionally dominated.
     """
     if active_agent == 1:
-        U1_cond = U1upper[:, p2actions]  # (M1, |s2|)
-        diff_mat = U1_cond[:, None, :] - U1lower[:, p2actions]  # (M1, M1, |s2|)
+        U1_cond = U1upper[:, a2actions]  # (M1, |s2|)
+        diff_mat = U1_cond[:, None, :] - U1lower[:, a2actions]  # (M1, M1, |s2|)
         diff_mat_max = np.max(diff_mat, axis=-1)  # (M1, M1)
         return np.intersect1d(
-            p1actions, np.array(list(set(np.where(diff_mat_max < 0)[0])))
+            a1actions, np.array(list(set(np.where(diff_mat_max < 0)[0])))
         )
     elif active_agent == 2:
-        U2_cond = U2upper[p1actions, :].T  # (M2, |s1|)
-        diff_mat = U2_cond[:, None, :] - U2lower[p1actions, :].T  # (M2, M2, |s1|)
+        U2_cond = U2upper[a1actions, :].T  # (M2, |s1|)
+        diff_mat = U2_cond[:, None, :] - U2lower[a1actions, :].T  # (M2, M2, |s1|)
         diff_mat_max = np.max(diff_mat, axis=-1)  # (M2, M2)
         return np.intersect1d(
-            p2actions, np.array(list(set(np.where(diff_mat_max < 0)[0])))
+            a2actions, np.array(list(set(np.where(diff_mat_max < 0)[0])))
         )
     else:
         raise NotImplemented
 
 
-def SEM(M1, M2, U1, U2):
+def SEM(U1, U2):
     """
     Runs the support-enumeration method (SEM) to find all mixed NEs.
-    :param M1: int. Number of actions for player 1.
-    :param M2: int. Number of actions for player 2.
     :param U1: Array of shape (M1, M2). Agent 1's utility matrix. Agent 1 row player, agent 2 column player.
     :param U2: Array of shape (M1, M2). Agent 2's utility matrix. Agent 1 row player, agent 2 column player.
     :return: list of all MNEs.
     """
+    M1, M2 = U1.shape
     pairs = [(x, y) for x in range(1, M1 + 1) for y in range(1, M2 + 1)]
     sorted_pairs = sort_size_balance(pairs)
     mnes = []
@@ -189,12 +227,8 @@ def SEM(M1, M2, U1, U2):
                         )
                         == 0
                     ):  # if true, run TGS
-                        cons, bounds = build_tgs_constraints(
-                            M1=M1, M2=M2, s1=s1, s2=s2, U1=U1, U2=U2
-                        )
-                        success, res = tgs(
-                            constraints=cons, bounds=bounds, M1=M1, M2=M2
-                        )
+                        cons, bounds = build_tgs_constraints(s1=s1, s2=s2, U1=U1, U2=U2)
+                        success, res = tgs(constraints=cons, bounds=bounds)
                         if success:
                             mnes.append(res)
     return mnes
@@ -232,7 +266,7 @@ def conditionally_dominated(p1actions, p2actions, active_agent, U1, U2):
 def tgs_var_utility(init_points, constraints, bounds):
     """
     Runs the variable utility nonlinear feasibility problem on an array of initial points to find potential MNEs.
-    :param init_points: array of shape (c, M1 + M2 + 2 + 2*(M1 + M2)).
+    :param init_points: array of shape (c, M1 + M2 + 2 + 2*(M1 * M2)).
     :param constraints: Tuple of constraint dicts.
     :param bounds: Tuple of bounds pairs.
     :return: (True, parameters) if a feasible set of parameters is found. Otherwise, returns (False, None).
@@ -254,8 +288,8 @@ def tgs_var_utility(init_points, constraints, bounds):
     return False, None
 
 
-def tgs(constraints, bounds, M1, M2):
-    x0 = np.zeros(M1 + M2 + 2)
+def tgs(constraints, bounds):
+    x0 = np.zeros(len(bounds))
     fun = lambda x: 0  # feasibility problem
     res = minimize(
         fun=fun, x0=x0, method="SLSQP", bounds=bounds, constraints=constraints
@@ -267,12 +301,10 @@ def tgs(constraints, bounds, M1, M2):
 
 
 def build_init_points(
-    M1, M2, s1, s2, U1upper, U1lower, U2upper, U2lower, num_rand_dists_per_agent, rng
+    s1, s2, U1upper, U1lower, U2upper, U2lower, num_rand_dists_per_agent, rng
 ):
     """
     Constructs an array of initial points for the nonlinear feasibility problem.
-    :param M1: int. Number of actions for player 1.
-    :param M2: int. Number of actions for player 2.
     :param s1: 1-D array with length from 1 to M. Indices of actions in agent 1's support, ints from 0 - M-1.
     :param s2: 1-D array with length from 1 to M. Indices of actions in agent 2's support, ints from 0 - M-1.
     :param U1upper: Array of shape (M1, M2). Agent 1's upper bound utility matrix. Agent 1 row player, agent 2 column
@@ -285,9 +317,10 @@ def build_init_points(
     player.
     :param num_rand_dists_per_agent: int.
     :param rng: NumPy rng object.
-    :return: array of shape (c, M1 + M2 + 2 + 2*(M1 + M2)). c initial points to pass to nonlinear feasibility
+    :return: array of shape (c, M1 + M2 + 2 + 2*(M1 * M2)). c initial points to pass to nonlinear feasibility
     program to find potential MNEs. c depends on specific implementation + num_rand_dists_per_agent
     """
+    M1, M2 = U1upper.shape
     # Indices
     u1start = M1 + M2 + 2
     u1end = u1start + M1 * M2 - 1
@@ -358,20 +391,19 @@ def build_init_points(
     return np.array(init_points)
 
 
-def build_tgs_constraints(M1, M2, s1, s2, U1, U2):
+def build_tgs_constraints(s1, s2, U1, U2):
     """
     Builds constraint dictionaries for feasibility program TGS with known utilities. Assumes variable x is an array
     of length 2 * (M + 1), where x[0] to x[M1-1] are the probabilities of each action for agent 1, x[M1] is the utility
     that agent 1 achieves, x[M1+1] to x[M1+M2] are the probabilities of each action for agent 2, and x[M1+M2+1] is the
     utility that agent 2 achieves.
-    :param M1: int. Total number of actions for player 1.
-    :param M2: int. Total number of actions for player 2.
     :param s1: 1-D array with length from 1 to M. Indices of actions in agent 1's support, ints from 0 - M-1.
     :param s2: 1-D array with length from 1 to M. Indices of actions in agent 2's support, ints from 0 - M-1.
     :param U1: Array of shape (M1, M2). Agent 1's utility matrix. Agent 1 row player, agent 2 column player.
     :param U2: Array of shape (M1, M2). Agent 2's utility matrix. Agent 1 row player, agent 2 column player.
     :return: Tuple of constraint dicts.
     """
+    M1, M2 = U1.shape
     s2_shifted = s2 + (M1 + 1)
     s1_c = np.setdiff1d(np.arange(0, M1), s1)
     s2_c = np.setdiff1d(np.arange(0, M2), s2)
@@ -402,16 +434,12 @@ def build_tgs_constraints(M1, M2, s1, s2, U1, U2):
     return (c1, c2, c3, c4, c5, c6, c7, c8), bounds
 
 
-def build_tgs_constraints_var_utility(
-    M1, M2, s1, s2, U1upper, U1lower, U2upper, U2lower
-):
+def build_tgs_constraints_var_utility(s1, s2, U1upper, U1lower, U2upper, U2lower):
     """
     Builds constraint dictionaries for feasibility program TGS with variable utilities. Assumes variable x is an array
     of length 2 * (M + 1), where x[0] to x[M1-1] are the probabilities of each action for agent 1, x[M1] is the utility
     that agent 1 achieves, x[M1+1] to x[M1+M2] are the probabilities of each action for agent 2, and x[M1+M2+1] is the
     utility that agent 2 achieves.
-    :param M1: int. Total number of actions for player 1.
-    :param M2: int. Total number of actions for player 2.
     :param s1: 1-D array with length from 1 to M. Indices of actions in agent 1's support, ints from 0 - M-1.
     :param s2: 1-D array with length from 1 to M. Indices of actions in agent 2's support, ints from 0 - M-1.
     :param U1upper: Array of shape (M1, M2). Agent 1's upper bound utility matrix. Agent 1 row player, agent 2 column
@@ -443,6 +471,7 @@ def build_tgs_constraints_var_utility(
         else:
             raise Exception("agent can only be 1 or 2")
 
+    M1, M2 = U1upper.shape
     s2_shifted = s2 + (M1 + 1)
     s1_c = np.setdiff1d(np.arange(0, M1), s1)
     s2_c = np.setdiff1d(np.arange(0, M2), s2)
