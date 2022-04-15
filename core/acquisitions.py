@@ -104,11 +104,12 @@ def ucb_pne(beta, domain, actions, response_dicts):
 
 
 def ucb_mne(beta, domain, M, rng):
-    def acq(models):
+    def acq(models, prev_successes):
         """
         Returns a pair of mixed strategies, and a batch of points to query next. Size of the batch will depend on the
         size of the supports of the potential MNE found.
         :param models: List of N GPflow GPs.
+        :param prev_successes:
         :return: Tuple (tuple of 2 arrays of shape (M,), array of shape (B, N))
         """
         ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
@@ -117,7 +118,7 @@ def ucb_mne(beta, domain, M, rng):
         U2upper = np.reshape(ucb_funcs[1](domain), (M, M))
         U2lower = np.reshape(lcb_funcs[1](domain), (M, M))
 
-        mne = SEM_var_utility(
+        mne_list, prev_successes = SEM_var_utility(
             U1upper=U1upper,
             U1lower=U1lower,
             U2upper=U2upper,
@@ -125,26 +126,32 @@ def ucb_mne(beta, domain, M, rng):
             num_rand_dists_per_agent=5,
             rng=rng,
             mode="first",
-        )[0]
-
+            prev_successes=prev_successes,
+            evaluation_mode="linear_with_sampling",
+            num_samples=10,
+        )
+        mne = mne_list[0]
         (s1, s2), (a1supp, a2supp) = get_strategies_and_support(mne, M, M)
 
         samples_coords = cross_product(a1supp[:, None], a2supp[:, None])
+        print(f"samples: {samples_coords}")
         exploring_samples_coords = []
         for a1 in a1supp:
-            a1_ucb = U1upper[a1]
+            a1_ucb = U2upper[a1]  # Given a1, can agent 2 do better?
             a1_ucb_argmax_a2coord = np.argmax(a1_ucb)
             if (
                 a1_ucb_argmax_a2coord not in a2supp
             ):  # if it is, we would already have sampled this
                 exploring_samples_coords.append([a1, a1_ucb_argmax_a2coord])
         for a2 in a2supp:
-            a2_ucb = U2upper[:, a2]
+            a2_ucb = U1upper[:, a2]  # Given a2, can agent 1 do better?
             a2_ucb_argmax_a1coord = np.argmax(a2_ucb)
             if (
                 a2_ucb_argmax_a1coord not in a1supp
             ):  # if it is, we would already have sampled this
                 exploring_samples_coords.append([a2_ucb_argmax_a1coord, a2])
+
+        print(f"exploring samples: {exploring_samples_coords}")
         if len(exploring_samples_coords) != 0:
             all_coords = np.concatenate(
                 [samples_coords, np.array(exploring_samples_coords)], axis=0
@@ -153,6 +160,6 @@ def ucb_mne(beta, domain, M, rng):
             all_coords = samples_coords
         all_domain_idxs = all_coords[:, 0] * M + all_coords[:, 1]
 
-        return domain[all_domain_idxs], (s1, s2)
+        return domain[all_domain_idxs], (s1, s2), prev_successes
 
     return acq

@@ -9,6 +9,7 @@ from core.mne import (
     SEM,
     SEM_var_utility,
     get_strategies_and_support,
+    evaluate_support,
 )
 
 rng = np.random.default_rng(0)
@@ -16,52 +17,12 @@ M1 = 3
 M2 = 2
 N = 2  # num_players
 
-U1upper = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) + 0.2
-U1lower = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) - 0.2
-U2upper = np.array([[2.1, 0.0], [0.0, 2.0], [6.1, 3.0]]) + 0.2
-U2lower = np.array([[2.1, 0.0], [0.0, 2.0], [5.1, 3.0]]) - 0.2
+U1lower = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) - 1
+U1upper = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) + 1
+U2lower = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]]) - 1
+U2upper = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]]) + 1
 
-# print("U1upper")
-# print(U1upper)
-# print("U1lower")
-# print(U1lower)
-# print("U2upper")
-# print(U2upper)
-# print("U2lower")
-# print(U2lower)
-
-# from core.utils import sort_size_balance
-# import itertools
-# from core.mne import conditionally_dominated_var_utility
-# pairs = [(x, y) for x in range(1, M1 + 1) for y in range(1, M2 + 1)]
-# sorted_pairs = sort_size_balance(pairs)
-# mnes = []
-# for pair in sorted_pairs:
-#     s1_size, s2_size = pair
-#     all_s1 = itertools.combinations(np.arange(M1), s1_size)
-#     for s1 in all_s1:
-#         all_s2 = itertools.combinations(np.arange(M2), s2_size)
-#         for s2 in all_s2:
-#             print(f"s1:{s1}, s2:{s2}")
-#             print("Agent 1:")
-#             print(conditionally_dominated_var_utility(p1actions=s1,
-#                                                       p2actions=s2,
-#                                                       active_agent=1,
-#                                                       U1upper=U1upper,
-#                                                       U1lower=U1lower,
-#                                                       U2upper=U2upper,
-#                                                       U2lower=U2lower))
-#             print("Agent 2:")
-#             print(conditionally_dominated_var_utility(p1actions=s1,
-#                                                       p2actions=s2,
-#                                                       active_agent=2,
-#                                                       U1upper=U1upper,
-#                                                       U1lower=U1lower,
-#                                                       U2upper=U2upper,
-#                                                       U2lower=U2lower))
-#             print("=======")
-
-all_res = SEM_var_utility(
+all_res, _ = SEM_var_utility(
     U1upper,
     U1lower,
     U2upper,
@@ -69,6 +30,9 @@ all_res = SEM_var_utility(
     num_rand_dists_per_agent=5,
     rng=rng,
     mode="all",
+    prev_successes=[],
+    evaluation_mode="linear_with_sampling",
+    num_samples=10,
 )
 u1start = M1 + M2 + 2
 u2start = u1start + M1 * M2
@@ -80,6 +44,85 @@ for res in all_res:
     print(f"U1: {np.reshape(res[u1start:u1start + M1 * M2], (M1, M2))}")
     print(f"U2: {np.reshape(res[u2start:u2start + M2 * M1], (M2, M1)).T}")
     print("==============")
+
+
+##################################################
+
+# rng = np.random.default_rng(0)
+# M1 = 3
+# M2 = 2
+# N = 2  # num_players
+#
+# # U1lower = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]])
+# # U1upper = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]])
+# # U2lower = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]])
+# # U2upper = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]])
+#
+# U1lower = np.array([[0.0, 1.0, -1.0], [-1.0, 0.0, 1], [1.0, -1.0, 0]]) - 0.01
+# U1upper = np.array([[0.0, 1.0, -1.0], [-1.0, 0.0, 1], [1.0, -1.0, 0]]) + 0.01
+# U2lower = np.array([[0.0, -1.0, 1.0], [1.0, 0.0, -1], [-1.0, 1.0, 0]]) - 0.01
+# U2upper = np.array([[0.0, -1.0, 1.0], [1.0, 0.0, -1], [-1.0, 1.0, 0]]) + 0.01
+#
+#
+# # print("U1upper")
+# # print(U1upper)
+# # print("U1lower")
+# # print(U1lower)
+# # print("U2upper")
+# # print(U2upper)
+# # print("U2lower")
+# # print(U2lower)
+#
+# # from core.utils import sort_size_balance
+# # import itertools
+# # from core.mne import conditionally_dominated_var_utility
+# # pairs = [(x, y) for x in range(1, M1 + 1) for y in range(1, M2 + 1)]
+# # sorted_pairs = sort_size_balance(pairs)
+# # mnes = []
+# # for pair in sorted_pairs:
+# #     s1_size, s2_size = pair
+# #     all_s1 = itertools.combinations(np.arange(M1), s1_size)
+# #     for s1 in all_s1:
+# #         all_s2 = itertools.combinations(np.arange(M2), s2_size)
+# #         for s2 in all_s2:
+# #             print(f"s1:{s1}, s2:{s2}")
+# #             print("Agent 1:")
+# #             print(conditionally_dominated_var_utility(p1actions=s1,
+# #                                                       p2actions=s2,
+# #                                                       active_agent=1,
+# #                                                       U1upper=U1upper,
+# #                                                       U1lower=U1lower,
+# #                                                       U2upper=U2upper,
+# #                                                       U2lower=U2lower))
+# #             print("Agent 2:")
+# #             print(conditionally_dominated_var_utility(p1actions=s1,
+# #                                                       p2actions=s2,
+# #                                                       active_agent=2,
+# #                                                       U1upper=U1upper,
+# #                                                       U1lower=U1lower,
+# #                                                       U2upper=U2upper,
+# #                                                       U2lower=U2lower))
+# #             print("=======")
+#
+# all_res = SEM_var_utility(
+#     U1upper,
+#     U1lower,
+#     U2upper,
+#     U2lower,
+#     num_rand_dists_per_agent=5,
+#     rng=rng,
+#     mode="all",
+# )
+# u1start = M1 + M2 + 2
+# u2start = u1start + M1 * M2
+# for res in all_res:
+#     (s1, s2), (a1supp, a2supp) = get_strategies_and_support(res, M1, M2)
+#     print((s1, s2), (a1supp, a2supp))
+#     print(f"Agent 1 strategy: {res[:M1]}, with value {res[M1]}")
+#     print(f"Agent 2 strategy: {res[M1 + 1:M1 + M2 + 1]}, with value {res[M1 + M2 + 1]}")
+#     print(f"U1: {np.reshape(res[u1start:u1start + M1 * M2], (M1, M2))}")
+#     print(f"U2: {np.reshape(res[u2start:u2start + M2 * M1], (M2, M1)).T}")
+#     print("==============")
 
 ####################################################
 

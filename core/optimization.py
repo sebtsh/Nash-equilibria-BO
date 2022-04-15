@@ -89,13 +89,15 @@ def bo_loop_mne(
     chosen_strategies = []
     sample_buffer = np.zeros((0, 0))
     strategy_buffer = None
+    prev_successes = []
     for t in trange(num_iters):
         if len(sample_buffer) == 0:
             models = create_models(
                 data=data, kernel=kernel, noise_variance=noise_variance
             )
-            sample_buffer, strategy_buffer = acquisition(models)  # (n, N)
-
+            sample_buffer, strategy_buffer, prev_successes = acquisition(
+                models, prev_successes
+            )  # (n, N)
         x_new = sample_buffer[0][None, :]
         sample_buffer = np.delete(sample_buffer, 0, axis=0)
         y_new = observer(x_new)

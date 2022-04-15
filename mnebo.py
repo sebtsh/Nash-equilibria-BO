@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import gpflow as gpf
+import pickle
 from core.objectives import sample_GP_prior_utilities, noisy_observer
 from core.utils import cross_product, create_response_dict
 from core.optimization import bo_loop_mne
@@ -13,15 +14,15 @@ from metrics.plotting import plot_utilities_2d, plot_regret
 acq_name = "ucb_mne"  # 'ucb_pne_naive', 'ucb_pne', 'ucb_mne'
 seed = 0
 num_agents = 2
-num_actions = 5
-ls = np.array([0.5] * num_agents)
+num_actions = 8
+ls = np.array([0.25] * num_agents)
 lowers = [0.0] * num_agents
 uppers = [1.0] * num_agents
-noise_variance = 0.1
+noise_variance = 0.01
 num_init_points = 2
 num_iters = 400
 beta = 2.0
-plot_utils = True
+plot_utils = False
 dir = "results/mne/"
 rng = np.random.default_rng(seed)
 tf.random.set_seed(seed)
@@ -62,6 +63,8 @@ print("U1:")
 print(U1)
 print("U2:")
 print(U2)
+
+# pickle.dump((U1, U2), open(dir + "U1U2", "wb"))
 
 all_res = SEM(U1, U2)
 for res in all_res:
@@ -104,3 +107,20 @@ print("Immediate regret:")
 print(imm_regret)
 print("Cumulative regret:")
 print(cumu_regret)
+regrets_save_dir = dir + "regrets/"
+plot_regret(
+    regret=imm_regret,
+    num_iters=num_iters,
+    title="MNE: Immediate regret",
+    save=True,
+    save_dir=regrets_save_dir,
+    filename="mne-imm",
+)
+plot_regret(
+    regret=cumu_regret,
+    num_iters=num_iters,
+    title="MNE: Cumulative regret",
+    save=True,
+    save_dir=regrets_save_dir,
+    filename="mne-cumu",
+)
