@@ -1,5 +1,6 @@
 from itertools import chain, combinations
 import numpy as np
+from scipy.optimize import minimize
 
 
 def cross_product(x, y):
@@ -97,3 +98,40 @@ def all_subset_actions(actions):
         return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
 
     return list(powerset(actions))[1:]
+
+
+def maximize_fn(f, bounds, rng, n_warmup=10000, n_iter=10):
+    """
+    Approximately maximizes a function f by sampling n_warmup random points in the domain, and then running L-BFGS-B
+    starting from n_iter points. Adapted from https://github.com/fmfn/BayesianOptimization.
+    :param f: Callable that takes in an array of shape (n, d) and returns an array of shape (n, 1).
+    :param bounds: Array of shape (d, 2). Lower and upper bounds of each variable.
+    :param rng: NumPy rng object.
+    :param n_warmup: int. Number of random samples.
+    :param n_iter: int. Number of L-BFGS-B starting points.
+    :return: Array of shape (d,).
+    """
+    d = bounds.shape[0]
+    # Random sampling
+    x_tries = rng.uniform(low=bounds[:, 0], high=bounds[:, 1], size=(n_warmup, d))
+    f_x = f(x_tries)
+    x_max = x_tries[np.argmax(f_x)]
+    f_max = np.max(f_x)
+
+    # L-BFGS-B
+    x_seeds = rng.uniform(bounds[:, 0], bounds[:, 1], size=(n_iter - 1, d))
+    x_seeds = np.concatenate([x_seeds, x_max[None, :]], axis=0)
+    for x_try in x_seeds:
+        res = minimize(
+            fun=lambda x: np.squeeze(-f(x[None, :])),
+            x0=x_try,
+            bounds=bounds,
+            method="L-BFGS-B",
+        )
+        if not res.success:
+            continue
+        if -res.fun >= f_max:
+            x_max = res.x
+            f_max = -res.fun
+
+    return np.clip(x_max, bounds[:, 0], bounds[:, 1])
