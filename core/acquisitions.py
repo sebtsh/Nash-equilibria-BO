@@ -2,20 +2,20 @@ import numpy as np
 
 from core.pne import best_response_payoff_pure, ucb_f
 from core.mne import SEM_var_utility, get_strategies_and_support
-from core.utils import cross_product
+from core.utils import cross_product, maximize_fn, maxmin_fn
 
 
-def get_acquisition(acq_name, beta, domain, actions, response_dicts, rng):
-    if acq_name == "ucb_pne_naive":
-        return ucb_pne_naive(
-            beta=beta, domain=domain, actions=actions, response_dicts=response_dicts
-        )
-    elif acq_name == "ucb_pne":
-        return ucb_pne(
-            beta=beta, domain=domain, actions=actions, response_dicts=response_dicts
-        )
+def get_acquisition(
+    acq_name, beta, bounds=None, agent_dims_bounds=None, domain=None, actions=None
+):
+    if acq_name == "ucb_pne":
+        if bounds is None or agent_dims_bounds is None:
+            raise Exception("bounds or agent_dims_bounds cannot be None")
+        return ucb_pne(beta=beta, bounds=bounds, agent_dims_bounds=agent_dims_bounds)
     elif acq_name == "ucb_mne":
-        return ucb_mne(beta=beta, domain=domain, M=len(actions), rng=rng)
+        if domain is None or actions is None:
+            raise Exception("domain or actions cannot be None")
+        return ucb_mne(beta=beta, domain=domain, M=len(actions))
     else:
         raise Exception("Invalid acquisition name")
 
@@ -25,7 +25,7 @@ def create_ci_funcs(models, beta):
     Converts GP models into UCB functions and LCB functions.
     :param models: List of N GPflow GPs.
     :param beta: float.
-    :return: Tuple, 2 lists of Callables that take in an array of shape (n, N) and return an array of shape (n, 1).
+    :return: Tuple, 2 lists of Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
     """
     N = len(models)
 
@@ -63,7 +63,7 @@ def ucb_pne_naive(beta, domain, actions, response_dicts):
     return acq
 
 
-def ucb_pne(beta, domain, actions, response_dicts):
+def ucb_pne_discrete(beta, domain, actions, response_dicts):
     def acq(models):
         """
         Returns N + 1 points to query next. First one is no-regret selection, next N are exploring samples.
@@ -103,8 +103,122 @@ def ucb_pne(beta, domain, actions, response_dicts):
     return acq
 
 
-def ucb_mne(beta, domain, M, rng):
-    def acq(models, prev_successes):
+def maximize_ucb_f(
+    ucb_funcs, lcb_funcs, bounds, agent_dims_bounds, rng, n_samples_outer=5
+):
+    """
+    Computes argmax_s min_i ucb f(s) over a continuous domain.
+    :param ucb_funcs: List of N Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
+    :param lcb_funcs: List of N Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
+    :param bounds: array of shape (dims, 2).
+    :param agent_dims_bounds: List of N tuples (start_dim, end_dim).
+    :param rng: NumPy rng object.
+    :param n_samples_outer int.
+    :return: Array of shape (dims).
+    """
+    dims = len(bounds)
+    N = len(agent_dims_bounds)
+    samples = rng.uniform(
+        low=bounds[:, 0], high=bounds[:, 1], size=(n_samples_outer, dims)
+    )
+
+    # Obtain UCB values of utilities
+    ucb_vals = np.concatenate(
+        [ucb_funcs[i](samples) for i in range(N)], axis=-1
+    )  # (num_samples_outer, N)
+
+    # Obtain maximum LCB values of best response
+    max_lcb_vals = []
+    for s in samples:
+        print("maximize_ucb_f sample computing")
+        agent_max_lcb_vals = []
+        for i in range(N):
+            start_dim, end_dim = agent_dims_bounds[i]
+            s_before = s[:start_dim]
+            s_after = s[end_dim:]
+
+            lcb_func = lcb_funcs[i]
+            _, max_lcb_val = maximize_fn(
+                f=lambda x: lcb_func(
+                    np.concatenate(
+                        [
+                            np.tile(s_before, (len(x), 1)),
+                            x,
+                            np.tile(s_after, (len(x), 1)),
+                        ],
+                        axis=-1,
+                    )
+                ),
+                bounds=bounds[start_dim:end_dim],
+                rng=rng,
+                n_warmup=100,
+                n_iter=5,
+            )
+            agent_max_lcb_vals.append(max_lcb_val)
+        max_lcb_vals.append(agent_max_lcb_vals)
+    max_lcb_vals = np.array(max_lcb_vals)  # (num_samples_outer, N)
+    assert np.allclose(max_lcb_vals.shape, ucb_vals.shape)
+
+    ucb_f_vals = np.minimum(ucb_vals - max_lcb_vals, 0.0)
+    max_idx = np.argmax(np.min(ucb_f_vals, axis=-1))
+    return samples[max_idx]
+
+
+def ucb_pne(beta, bounds, agent_dims_bounds):
+    def acq(models, rng):
+        """
+        Returns N + 1 points to query next. First one is no-regret selection, next N are exploring samples.
+        :param models: List of N GPflow GPs.
+        :return: array of shape (N + 1, N).
+        """
+        N = len(agent_dims_bounds)
+        ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
+        samples = []
+        # Pick no-regret selection
+        noreg_sample, _ = maxmin_fn(
+            outer_funcs=ucb_funcs,
+            inner_funcs=lcb_funcs,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            rng=rng,
+            n_samples_outer=100,
+        )
+        samples.append(noreg_sample)
+
+        # Pick exploring samples
+        for i in range(N):
+            start_dim, end_dim = agent_dims_bounds[i]
+            s_before = noreg_sample[:start_dim]
+            s_after = noreg_sample[end_dim:]
+
+            ucb_func = ucb_funcs[i]
+            max_ucb_sample, _ = maximize_fn(
+                f=lambda x: np.squeeze(
+                    ucb_func(
+                        np.concatenate(
+                            [
+                                np.tile(s_before, (len(x), 1)),
+                                x,
+                                np.tile(s_after, (len(x), 1)),
+                            ],
+                            axis=-1,
+                        )
+                    ),
+                ),
+                bounds=bounds[start_dim:end_dim],
+                rng=rng,
+                n_warmup=100,
+                n_iter=5,
+            )
+            samples.append(np.concatenate([s_before, max_ucb_sample, s_after]))
+
+        return np.array(samples)
+
+    return acq
+
+
+def ucb_mne(beta, domain, M):
+    def acq(models, prev_successes, rng):
         """
         Returns a pair of mixed strategies, and a batch of points to query next. Size of the batch will depend on the
         size of the supports of the potential MNE found.

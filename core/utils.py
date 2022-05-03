@@ -111,7 +111,7 @@ def maximize_fn(f, bounds, rng, n_warmup=10000, n_iter=10):
     :param n_iter: int. Number of L-BFGS-B starting points.
     :return: Array of shape (d,).
     """
-    d = bounds.shape[0]
+    d = len(bounds)
     # Random sampling
     x_tries = rng.uniform(low=bounds[:, 0], high=bounds[:, 1], size=(n_warmup, d))
     f_x = f(x_tries)
@@ -134,4 +134,92 @@ def maximize_fn(f, bounds, rng, n_warmup=10000, n_iter=10):
             x_max = res.x
             f_max = -res.fun
 
-    return np.clip(x_max, bounds[:, 0], bounds[:, 1])
+    return np.clip(x_max, bounds[:, 0], bounds[:, 1]), f_max
+
+
+def get_agent_dims_bounds(agent_dims):
+    """
+     WARNING FOR FUTURE SELF: To get agent i's slice of a strategy profile, do s[start_dim : end_dim], i.e., the +1 is
+     included here. This was not the case for the mixed NE code.
+    :param agent_dims: list of N ints.
+    :return: returns a list of N tuples (start_dim, end_dim) for each agent.
+    """
+    current_start = 0
+    agent_dims_bounds = []
+    for interval in agent_dims:
+        next_start = current_start + interval
+        agent_dims_bounds.append((current_start, next_start))
+        current_start = next_start
+    return agent_dims_bounds
+
+
+def maxmin_fn(
+    outer_funcs,
+    inner_funcs,
+    bounds,
+    agent_dims_bounds,
+    rng,
+    n_samples_outer=100,
+    shrink_factors=None,
+):
+    """
+
+    :param outer_funcs:
+    :param inner_funcs:
+    :param bounds:
+    :param agent_dims_bounds:
+    :param rng:
+    :param n_samples_outer:
+    :param shrink_factors: list of floats. if None, only runs sampling procedure once. Otherwise, will progressively
+    shrink bounds around best found point. For example, if set to [1/5, 1/10], will shrink each dimension to 1/5 of its
+    original length and restart sampling procedure, and then shrink again to 1/10 and sample again.
+    :return:
+    """
+    dims = len(bounds)
+    N = len(agent_dims_bounds)
+    samples = rng.uniform(
+        low=bounds[:, 0], high=bounds[:, 1], size=(n_samples_outer, dims)
+    )
+
+    # Obtain values of outer function
+    outer_vals = np.concatenate(
+        [outer_funcs[i](samples) for i in range(N)], axis=-1
+    )  # (num_samples_outer, N)
+
+    # Obtain maximum of inner function
+    max_inner_vals = []
+    for s in samples:
+        print("maximize_ucb_f sample computing")
+        agent_max_inner_vals = []
+        for i in range(N):
+            start_dim, end_dim = agent_dims_bounds[i]
+            s_before = s[:start_dim]
+            s_after = s[end_dim:]
+
+            inner_func = inner_funcs[i]
+            _, max_inner_val = maximize_fn(
+                f=lambda x: inner_func(
+                    np.concatenate(
+                        [
+                            np.tile(s_before, (len(x), 1)),
+                            x,
+                            np.tile(s_after, (len(x), 1)),
+                        ],
+                        axis=-1,
+                    )
+                ),
+                bounds=bounds[start_dim:end_dim],
+                rng=rng,
+                n_warmup=100,
+                n_iter=5,
+            )
+            agent_max_inner_vals.append(max_inner_val)
+        max_inner_vals.append(agent_max_inner_vals)
+    max_inner_vals = np.array(max_inner_vals)  # (num_samples_outer, N)
+    assert np.allclose(max_inner_vals.shape, outer_vals.shape)
+
+    outer_minus_inner_vals = np.minimum(outer_vals - max_inner_vals, 0.0)
+    max_idx = np.argmax(np.min(outer_minus_inner_vals, axis=-1))
+    max_val = np.min(outer_minus_inner_vals, axis=-1)[max_idx]
+
+    return samples[max_idx], max_val

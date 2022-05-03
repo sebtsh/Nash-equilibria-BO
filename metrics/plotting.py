@@ -3,9 +3,78 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 from core.pne import best_response_payoff_pure
+from core.utils import cross_product
 
 
 def plot_utilities_2d(
+    u,
+    bounds,
+    num_discrete=200,
+    title="",
+    cmap="Spectral",
+    save=False,
+    save_dir="",
+    filename="",
+    show_plot=True,
+):
+    ymin, ymax = bounds[0]
+    xmin, xmax = bounds[1]
+
+    actions1 = np.linspace(ymin, ymax, num_discrete)
+    actions2 = np.linspace(xmin, xmax, num_discrete)
+    domain = cross_product(actions1[:, None], actions2[:, None])
+
+    xlabel = "Agent 2 actions"
+    ylabel = "Agent 1 actions"
+    # print(f"domain: {np.reshape(domain, [num_discrete, num_discrete, 2])}")
+    u1_vals = u[0](domain)
+    u1_reshaped = np.reshape(u1_vals, [num_discrete, num_discrete])
+    # print(f"u1: {u1_reshaped}")
+    u2_vals = u[1](domain)
+    u2_reshaped = np.reshape(u2_vals, [num_discrete, num_discrete])
+    # print(f"u2: {u2_reshaped}")
+
+    offset = (1 / num_discrete) / 2
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig.suptitle(title, size=20)
+    fig.set_size_inches(8, 4)
+    fig.set_dpi(200)
+
+    im1 = ax1.imshow(
+        u1_reshaped,
+        interpolation="nearest",
+        extent=(ymin - offset, ymax + offset, xmax + offset, xmin - offset),
+        origin="upper",
+        cmap=cmap,
+        # aspect=(ymax - ymin) / (xmax - xmin),
+    )
+    ax1.set_title("Agent 1 utility", size=16)
+    ax1.set_xlabel(xlabel, size=12)
+    ax1.set_ylabel(ylabel, size=12)
+    fig.colorbar(im1, ax=ax1)
+
+    im2 = ax2.imshow(
+        u2_reshaped,
+        interpolation="None",
+        extent=(ymin - offset, ymax + offset, xmax + offset, xmin - offset),
+        origin="upper",
+        cmap=cmap,
+        # aspect=(ymax - ymin) / (xmax - xmin),
+    )
+    ax2.set_title("Agent 2 utility", size=16)
+    ax2.set_xlabel(xlabel, size=12)
+    ax2.set_ylabel(ylabel, size=12)
+    fig.colorbar(im2, ax=ax2)
+
+    fig.tight_layout()
+    if save:
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_dir + filename, bbox_inches="tight")
+    if show_plot:
+        plt.show()
+
+
+def plot_utilities_2d_discrete(
     u,
     xlims,
     ylims,
@@ -205,7 +274,6 @@ def plot_models_2d(
 def plot_regret(
     regret, num_iters, title="", save=False, save_dir="", filename="", show_plot=False
 ):
-
     fig, (ax1) = plt.subplots(1, 1)
     fig.suptitle(title, size=12)
     fig.set_size_inches(12, 6)
