@@ -100,9 +100,9 @@ def all_subset_actions(actions):
     return list(powerset(actions))[1:]
 
 
-def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10):
+def maximize_fn(f, bounds, rng, n_warmup=10000, n_iter=10):
     """
-    Approximately maximizes a function f. Sampling + L-BFGS-B method adapted from
+    Approximately maximizes a function f using sampling + L-BFGS-B method adapted from
     https://github.com/fmfn/BayesianOptimization.
     :param f: Callable that takes in an array of shape (n, d) and returns an array of shape (n, 1).
     :param bounds: Array of shape (d, 2). Lower and upper bounds of each variable.
@@ -114,41 +114,27 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10):
     """
     d = len(bounds)
 
-    if mode == "L-BFGS-B":
-        # Random sampling
-        x_tries = rng.uniform(low=bounds[:, 0], high=bounds[:, 1], size=(n_warmup, d))
-        f_x = f(x_tries)
-        x_max = x_tries[np.argmax(f_x)]
-        f_max = np.max(f_x)
+    # Random sampling
+    x_tries = rng.uniform(low=bounds[:, 0], high=bounds[:, 1], size=(n_warmup, d))
+    f_x = f(x_tries)
+    x_max = x_tries[np.argmax(f_x)]
+    f_max = np.max(f_x)
 
-        # L-BFGS-B
-        x_seeds = rng.uniform(bounds[:, 0], bounds[:, 1], size=(n_iter - 1, d))
-        x_seeds = np.concatenate([x_seeds, x_max[None, :]], axis=0)
-        for x_try in x_seeds:
-            res = minimize(
-                fun=lambda x: np.squeeze(-f(x[None, :])),
-                x0=x_try,
-                bounds=bounds,
-                method="L-BFGS-B",
-            )
-            if not res.success:
-                continue
-            if -res.fun >= f_max:
-                x_max = res.x
-                f_max = -res.fun
-
-    elif mode == "DIRECT":
-        from scipydirect import minimize as direct_minimize
-
-        res = direct_minimize(
+    # L-BFGS-B
+    x_seeds = rng.uniform(bounds[:, 0], bounds[:, 1], size=(n_iter - 1, d))
+    x_seeds = np.concatenate([x_seeds, x_max[None, :]], axis=0)
+    for x_try in x_seeds:
+        res = minimize(
             fun=lambda x: np.squeeze(-f(x[None, :])),
+            x0=x_try,
             bounds=bounds,
+            method="L-BFGS-B",
         )
-        x_max = res.x
-        f_max = -res.fun
-
-    else:
-        raise Exception("Incorrect mode passed to maximize_fn")
+        if not res.success:
+            continue
+        if -res.fun >= f_max:
+            x_max = res.x
+            f_max = -res.fun
 
     return np.clip(x_max, bounds[:, 0], bounds[:, 1]), f_max
 
@@ -174,9 +160,9 @@ def maxmin_fn(
     inner_funcs,
     bounds,
     agent_dims_bounds,
+    mode,
     rng,
     n_samples_outer=100,
-    shrink_factors=None,
 ):
     """
 
@@ -185,57 +171,97 @@ def maxmin_fn(
     :param bounds:
     :param agent_dims_bounds:
     :param rng:
+    :param mode: str. Either 'DIRECT' or 'random'.
     :param n_samples_outer:
-    :param shrink_factors: list of floats. if None, only runs sampling procedure once. Otherwise, will progressively
-    shrink bounds around best found point. For example, if set to [1/5, 1/10], will shrink each dimension to 1/5 of its
-    original length and restart sampling procedure, and then shrink again to 1/10 and sample again.
     :return:
     """
     dims = len(bounds)
     N = len(agent_dims_bounds)
-    samples = rng.uniform(
-        low=bounds[:, 0], high=bounds[:, 1], size=(n_samples_outer, dims)
-    )
 
-    # Obtain values of outer function
-    outer_vals = np.concatenate(
-        [outer_funcs[i](samples) for i in range(N)], axis=-1
-    )  # (num_samples_outer, N)
+    if mode == "random":
+        samples = rng.uniform(
+            low=bounds[:, 0], high=bounds[:, 1], size=(n_samples_outer, dims)
+        )
 
-    # Obtain maximum of inner function
-    max_inner_vals = []
-    for s in samples:
-        print("maximize_ucb_f sample computing")
-        agent_max_inner_vals = []
-        for i in range(N):
-            start_dim, end_dim = agent_dims_bounds[i]
-            s_before = s[:start_dim]
-            s_after = s[end_dim:]
+        # Obtain values of outer function
+        outer_vals = np.concatenate(
+            [outer_funcs[i](samples) for i in range(N)], axis=-1
+        )  # (num_samples_outer, N)
 
-            inner_func = inner_funcs[i]
-            _, max_inner_val = maximize_fn(
-                f=lambda x: inner_func(
-                    np.concatenate(
-                        [
-                            np.tile(s_before, (len(x), 1)),
-                            x,
-                            np.tile(s_after, (len(x), 1)),
-                        ],
-                        axis=-1,
-                    )
-                ),
-                bounds=bounds[start_dim:end_dim],
-                rng=rng,
-                n_warmup=100,
-                n_iter=5,
+        # Obtain maximum of inner function
+        max_inner_vals = []
+        for s in samples:
+            # print("maximize_ucb_f sample computing")
+            agent_max_inner_vals = []
+            for i in range(N):
+                start_dim, end_dim = agent_dims_bounds[i]
+                s_before = s[:start_dim]
+                s_after = s[end_dim:]
+
+                inner_func = inner_funcs[i]
+                _, max_inner_val = maximize_fn(
+                    f=lambda x: inner_func(
+                        np.concatenate(
+                            [
+                                np.tile(s_before, (len(x), 1)),
+                                x,
+                                np.tile(s_after, (len(x), 1)),
+                            ],
+                            axis=-1,
+                        )
+                    ),
+                    bounds=bounds[start_dim:end_dim],
+                    rng=rng,
+                    n_warmup=100,
+                    n_iter=5,
+                )
+                agent_max_inner_vals.append(max_inner_val)
+            max_inner_vals.append(agent_max_inner_vals)
+        max_inner_vals = np.array(max_inner_vals)  # (num_samples_outer, N)
+        assert np.allclose(max_inner_vals.shape, outer_vals.shape)
+
+        outer_minus_inner_vals = np.minimum(outer_vals - max_inner_vals, 0.0)
+        max_idx = np.argmax(np.min(outer_minus_inner_vals, axis=-1))
+        max_val = np.min(outer_minus_inner_vals, axis=-1)[max_idx]
+
+        return samples[max_idx], max_val
+
+    elif mode == "DIRECT":
+        from scipydirect import minimize as direct_minimize
+
+        def obj(s):
+            agent_max_inner_vals = []
+            for i in range(N):
+                start_dim, end_dim = agent_dims_bounds[i]
+                s_before = s[:start_dim]
+                s_after = s[end_dim:]
+
+                inner_func = inner_funcs[i]
+                _, max_inner_val = maximize_fn(
+                    f=lambda x: inner_func(
+                        np.concatenate(
+                            [
+                                np.tile(s_before, (len(x), 1)),
+                                x,
+                                np.tile(s_after, (len(x), 1)),
+                            ],
+                            axis=-1,
+                        )
+                    ),
+                    bounds=bounds[start_dim:end_dim],
+                    rng=rng,
+                    n_warmup=100,
+                    n_iter=5,
+                )
+                agent_max_inner_vals.append(max_inner_val)
+            outer_vals = np.array(
+                [np.squeeze(outer_funcs[i](s[None, :])) for i in range(N)]
             )
-            agent_max_inner_vals.append(max_inner_val)
-        max_inner_vals.append(agent_max_inner_vals)
-    max_inner_vals = np.array(max_inner_vals)  # (num_samples_outer, N)
-    assert np.allclose(max_inner_vals.shape, outer_vals.shape)
+            return np.max(np.array(agent_max_inner_vals) - outer_vals)
 
-    outer_minus_inner_vals = np.minimum(outer_vals - max_inner_vals, 0.0)
-    max_idx = np.argmax(np.min(outer_minus_inner_vals, axis=-1))
-    max_val = np.min(outer_minus_inner_vals, axis=-1)[max_idx]
+        res = direct_minimize(obj, bounds=bounds, algmethod=1, maxT=n_samples_outer)
 
-    return samples[max_idx], max_val
+        return res.x, res.fun
+
+    else:
+        raise Exception("Incorrect mode passed to maxmin_fn")

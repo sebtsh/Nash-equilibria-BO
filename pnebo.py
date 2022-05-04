@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import gpflow as gpf
+import time
 from core.objectives import sample_GP_prior_utilities, noisy_observer
 from core.models import create_models
 from core.optimization import bo_loop_pne
@@ -21,6 +22,7 @@ noise_variance = 0.1
 num_init_points = 10
 num_iters = 50
 beta = 2.0
+maxmin_mode = "random"
 plot_utils = True
 dir = "results/testcont/"
 rng = np.random.default_rng(seed)
@@ -53,8 +55,30 @@ models = create_models(data=init_data, kernel=kernel, noise_variance=noise_varia
 
 agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
 acq_func = get_acquisition(
-    acq_name=acq_name, beta=beta, bounds=bounds, agent_dims_bounds=agent_dims_bounds
+    acq_name=acq_name,
+    beta=beta,
+    bounds=bounds,
+    agent_dims_bounds=agent_dims_bounds,
+    mode=maxmin_mode,
 )
+
+for mode in ["random", "DIRECT"]:
+    maxmin_mode = mode
+    print("===============")
+    print(f"maxmin_mode = {maxmin_mode}")
+    acq_func = get_acquisition(
+        acq_name=acq_name,
+        beta=beta,
+        bounds=bounds,
+        agent_dims_bounds=agent_dims_bounds,
+        mode=maxmin_mode,
+    )
+    start = time.process_time()
+    res = acq_func(models=models, rng=rng)
+    end = time.process_time()
+    print(f"res: {res}")
+    print(f"Mode {mode} took {end-start} seconds")
+
 
 # final_data = bo_loop_pne(
 #     init_data=init_data,
