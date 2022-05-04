@@ -5,7 +5,7 @@ import time
 from core.objectives import sample_GP_prior_utilities, noisy_observer
 from core.models import create_models
 from core.optimization import bo_loop_pne
-from core.acquisitions import get_acquisition
+from core.acquisitions import get_acquisition, create_ci_funcs
 from core.utils import get_agent_dims_bounds
 from metrics.regret import calc_regret_pne
 from metrics.plotting import plot_utilities_2d, plot_regret
@@ -16,14 +16,15 @@ seed = 0
 agent_dims = [1, 1]  # this determines num_agents and dims
 num_agents = len(agent_dims)
 dims = np.sum(agent_dims)
-ls = np.array([0.4] * dims)
+ls = np.array([1.] * dims)
 bounds = np.array([[-1.0, 1.0] for _ in range(dims)])
 noise_variance = 0.1
-num_init_points = 10
+num_init_points = 20
 num_iters = 50
 beta = 2.0
 maxmin_mode = "random"
-plot_utils = True
+n_samples_outer = 3
+plot_utils = False
 dir = "results/testcont/"
 rng = np.random.default_rng(seed)
 tf.random.set_seed(seed)
@@ -60,23 +61,73 @@ acq_func = get_acquisition(
     bounds=bounds,
     agent_dims_bounds=agent_dims_bounds,
     mode=maxmin_mode,
+    n_samples_outer=n_samples_outer
 )
 
-for mode in ["random", "DIRECT"]:
+from core.utils import maximize_fn
+def evaluate_sample(s, outer_funcs, inner_funcs, bounds, agent_dims_bounds):
+    dims = len(bounds)
+    N = len(agent_dims_bounds)
+
+    outer_vals = np.array(
+        [np.squeeze(outer_funcs[i](s[None, :])) for i in range(N)]
+    )  # (N)
+
+    agent_max_inner_vals = []
+    for i in range(N):
+        start_dim, end_dim = agent_dims_bounds[i]
+        s_before = s[:start_dim]
+        s_after = s[end_dim:]
+
+        inner_func = inner_funcs[i]
+        _, max_inner_val = maximize_fn(
+            f=lambda x: inner_func(
+                np.concatenate(
+                    [
+                        np.tile(s_before, (len(x), 1)),
+                        x,
+                        np.tile(s_after, (len(x), 1)),
+                    ],
+                    axis=-1,
+                )
+            ),
+            bounds=bounds[start_dim:end_dim],
+            rng=rng,
+            n_warmup=100,
+            n_iter=5,
+        )
+        agent_max_inner_vals.append(max_inner_val)
+    return np.min(outer_vals - np.array(agent_max_inner_vals), 0)
+
+ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
+for mode in ["DIRECT", "random"]:
     maxmin_mode = mode
     print("===============")
     print(f"maxmin_mode = {maxmin_mode}")
+
+    if mode == "DIRECT":
+        n_samples_outer = 20
+    else:
+        n_samples_outer = 100
+
+    print(f"n_samples_outer: {n_samples_outer}")
     acq_func = get_acquisition(
         acq_name=acq_name,
         beta=beta,
         bounds=bounds,
         agent_dims_bounds=agent_dims_bounds,
         mode=maxmin_mode,
+        n_samples_outer=n_samples_outer,
     )
     start = time.process_time()
     res = acq_func(models=models, rng=rng)
     end = time.process_time()
     print(f"res: {res}")
+    res_score = evaluate_sample(res[0], outer_funcs=ucb_funcs,
+                                inner_funcs=lcb_funcs,
+                                bounds=bounds,
+                                agent_dims_bounds=agent_dims_bounds)
+    print(f"no-regret sample score: {res_score}")
     print(f"Mode {mode} took {end-start} seconds")
 
 
