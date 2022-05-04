@@ -258,7 +258,7 @@ def maxmin_fn(
                 [np.squeeze(outer_funcs[i](s[None, :])) for i in range(N)]
             )
             #print("Finished inner obj")
-            return np.max(np.array(agent_max_inner_vals) - outer_vals)
+            return np.max(np.maximum(np.array(agent_max_inner_vals) - outer_vals, 0.))
 
         res = direct_minimize(obj, bounds=bounds, algmethod=1, maxT=n_samples_outer)
 
