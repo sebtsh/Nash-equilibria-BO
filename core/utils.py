@@ -262,7 +262,7 @@ def maxmin_fn(
 
         res = direct_minimize(obj, bounds=bounds, algmethod=1, maxT=n_samples_outer)
 
-        return res.x, res.fun
+        return res.x, -res.fun
 
     else:
         raise Exception("Incorrect mode passed to maxmin_fn")
