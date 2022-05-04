@@ -23,6 +23,7 @@ num_init_points = 10
 num_iters = 50
 beta = 2.0
 maxmin_mode = "random"
+n_samples_outer = 3
 plot_utils = True
 dir = "results/testcont/"
 rng = np.random.default_rng(seed)
@@ -62,7 +63,7 @@ acq_func = get_acquisition(
     mode=maxmin_mode,
 )
 
-for mode in ["random", "DIRECT"]:
+for mode in ["DIRECT", "random"]:
     maxmin_mode = mode
     print("===============")
     print(f"maxmin_mode = {maxmin_mode}")
@@ -72,6 +73,7 @@ for mode in ["random", "DIRECT"]:
         bounds=bounds,
         agent_dims_bounds=agent_dims_bounds,
         mode=maxmin_mode,
+        n_samples_outer=n_samples_outer,
     )
     start = time.process_time()
     res = acq_func(models=models, rng=rng)

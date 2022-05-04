@@ -13,12 +13,13 @@ def get_acquisition(
     mode=None,
     domain=None,
     actions=None,
+    n_samples_outer=None,
 ):
     if acq_name == "ucb_pne":
-        if bounds is None or agent_dims_bounds is None or mode is None:
-            raise Exception("bounds or agent_dims_bounds or mode cannot be None")
+        if bounds is None or agent_dims_bounds is None or mode is None or n_samples_outer is None:
+            raise Exception("one of required params is None")
         return ucb_pne(
-            beta=beta, bounds=bounds, agent_dims_bounds=agent_dims_bounds, mode=mode
+            beta=beta, bounds=bounds, agent_dims_bounds=agent_dims_bounds, mode=mode, n_samples_outer=n_samples_outer
         )
     elif acq_name == "ucb_mne":
         if domain is None or actions is None:
@@ -172,7 +173,7 @@ def maximize_ucb_f(
     return samples[max_idx]
 
 
-def ucb_pne(beta, bounds, agent_dims_bounds, mode):
+def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
     def acq(models, rng):
         """
         Returns N + 1 points to query next. First one is no-regret selection, next N are exploring samples.
@@ -190,7 +191,7 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode):
             agent_dims_bounds=agent_dims_bounds,
             mode=mode,
             rng=rng,
-            n_samples_outer=100,
+            n_samples_outer=n_samples_outer,
         )
         samples.append(noreg_sample)
 
