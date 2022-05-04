@@ -110,6 +110,7 @@ for mode in ["DIRECT", "random"]:
     else:
         n_samples_outer = 100
 
+    print(f"n_samples_outer: {n_samples_outer}")
     acq_func = get_acquisition(
         acq_name=acq_name,
         beta=beta,
