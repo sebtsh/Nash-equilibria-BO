@@ -104,6 +104,12 @@ for mode in ["DIRECT", "random"]:
     maxmin_mode = mode
     print("===============")
     print(f"maxmin_mode = {maxmin_mode}")
+
+    if mode == "DIRECT":
+        n_samples_outer = 20
+    else:
+        n_samples_outer = 100
+
     acq_func = get_acquisition(
         acq_name=acq_name,
         beta=beta,
