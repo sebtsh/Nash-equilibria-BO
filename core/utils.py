@@ -100,39 +100,55 @@ def all_subset_actions(actions):
     return list(powerset(actions))[1:]
 
 
-def maximize_fn(f, bounds, rng, n_warmup=10000, n_iter=10):
+def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10):
     """
-    Approximately maximizes a function f by sampling n_warmup random points in the domain, and then running L-BFGS-B
-    starting from n_iter points. Adapted from https://github.com/fmfn/BayesianOptimization.
+    Approximately maximizes a function f. Sampling + L-BFGS-B method adapted from
+    https://github.com/fmfn/BayesianOptimization.
     :param f: Callable that takes in an array of shape (n, d) and returns an array of shape (n, 1).
     :param bounds: Array of shape (d, 2). Lower and upper bounds of each variable.
     :param rng: NumPy rng object.
+    :param mode: str. Either 'DIRECT' or 'L-BFGS-B'.
     :param n_warmup: int. Number of random samples.
     :param n_iter: int. Number of L-BFGS-B starting points.
     :return: Array of shape (d,).
     """
     d = len(bounds)
-    # Random sampling
-    x_tries = rng.uniform(low=bounds[:, 0], high=bounds[:, 1], size=(n_warmup, d))
-    f_x = f(x_tries)
-    x_max = x_tries[np.argmax(f_x)]
-    f_max = np.max(f_x)
 
-    # L-BFGS-B
-    x_seeds = rng.uniform(bounds[:, 0], bounds[:, 1], size=(n_iter - 1, d))
-    x_seeds = np.concatenate([x_seeds, x_max[None, :]], axis=0)
-    for x_try in x_seeds:
-        res = minimize(
+    if mode == "L-BFGS-B":
+        # Random sampling
+        x_tries = rng.uniform(low=bounds[:, 0], high=bounds[:, 1], size=(n_warmup, d))
+        f_x = f(x_tries)
+        x_max = x_tries[np.argmax(f_x)]
+        f_max = np.max(f_x)
+
+        # L-BFGS-B
+        x_seeds = rng.uniform(bounds[:, 0], bounds[:, 1], size=(n_iter - 1, d))
+        x_seeds = np.concatenate([x_seeds, x_max[None, :]], axis=0)
+        for x_try in x_seeds:
+            res = minimize(
+                fun=lambda x: np.squeeze(-f(x[None, :])),
+                x0=x_try,
+                bounds=bounds,
+                method="L-BFGS-B",
+            )
+            if not res.success:
+                continue
+            if -res.fun >= f_max:
+                x_max = res.x
+                f_max = -res.fun
+
+    elif mode == "DIRECT":
+        from scipydirect import minimize as direct_minimize
+
+        res = direct_minimize(
             fun=lambda x: np.squeeze(-f(x[None, :])),
-            x0=x_try,
             bounds=bounds,
-            method="L-BFGS-B",
         )
-        if not res.success:
-            continue
-        if -res.fun >= f_max:
-            x_max = res.x
-            f_max = -res.fun
+        x_max = res.x
+        f_max = -res.fun
+
+    else:
+        raise Exception("Incorrect mode passed to maximize_fn")
 
     return np.clip(x_max, bounds[:, 0], bounds[:, 1]), f_max
 
