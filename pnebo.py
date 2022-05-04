@@ -97,7 +97,7 @@ def evaluate_sample(s, outer_funcs, inner_funcs, bounds, agent_dims_bounds):
             n_iter=5,
         )
         agent_max_inner_vals.append(max_inner_val)
-    return np.min(np.minimum(outer_vals - np.array(agent_max_inner_vals), 0))
+    return np.min(outer_vals - np.array(agent_max_inner_vals), 0)
 
 ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
 for mode in ["DIRECT", "random"]:
