@@ -24,7 +24,7 @@ num_iters = 50
 beta = 2.0
 maxmin_mode = "random"
 n_samples_outer = 3
-plot_utils = True
+plot_utils = False
 dir = "results/testcont/"
 rng = np.random.default_rng(seed)
 tf.random.set_seed(seed)
@@ -61,6 +61,7 @@ acq_func = get_acquisition(
     bounds=bounds,
     agent_dims_bounds=agent_dims_bounds,
     mode=maxmin_mode,
+    n_samples_outer=n_samples_outer
 )
 
 for mode in ["DIRECT", "random"]:
