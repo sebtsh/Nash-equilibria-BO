@@ -265,6 +265,7 @@ def maxmin_fn(
                     ),
                     bounds=bounds[start_dim:end_dim],
                     rng=rng,
+                    mode="L-BFGS-B",
                     n_warmup=100,
                     n_iter=5,
                 )
