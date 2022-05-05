@@ -217,6 +217,7 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
                 ),
                 bounds=bounds[start_dim:end_dim],
                 rng=rng,
+                mode='DIRECT',
                 n_warmup=100,
                 n_iter=5,
             )
