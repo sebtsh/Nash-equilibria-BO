@@ -56,3 +56,38 @@ def ucb_f(all_ucb, all_lcb, S, actions, response_dicts):
             ucb_f_vals[i, j] = current_ucb - max_lcb
 
     return np.maximum(ucb_f_vals, 0)  # since f <= 0
+
+
+def evaluate_sample(s, outer_funcs, inner_funcs, bounds, agent_dims_bounds, rng, mode):
+    N = len(agent_dims_bounds)
+
+    outer_vals = np.array(
+        [np.squeeze(outer_funcs[i](s[None, :])) for i in range(N)]
+    )  # (N)
+
+    agent_max_inner_vals = []
+    for i in range(N):
+        start_dim, end_dim = agent_dims_bounds[i]
+        s_before = s[:start_dim]
+        s_after = s[end_dim:]
+
+        inner_func = inner_funcs[i]
+        _, max_inner_val = maximize_fn(
+            f=lambda x: inner_func(
+                np.concatenate(
+                    [
+                        np.tile(s_before, (len(x), 1)),
+                        x,
+                        np.tile(s_after, (len(x), 1)),
+                    ],
+                    axis=-1,
+                )
+            ),
+            bounds=bounds[start_dim:end_dim],
+            rng=rng,
+            mode=mode,
+            n_warmup=100,
+            n_iter=5,
+        )
+        agent_max_inner_vals.append(max_inner_val)
+    return np.min(outer_vals - np.array(agent_max_inner_vals))

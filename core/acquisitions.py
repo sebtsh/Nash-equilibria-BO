@@ -16,10 +16,19 @@ def get_acquisition(
     n_samples_outer=None,
 ):
     if acq_name == "ucb_pne":
-        if bounds is None or agent_dims_bounds is None or mode is None or n_samples_outer is None:
+        if (
+            bounds is None
+            or agent_dims_bounds is None
+            or mode is None
+            or n_samples_outer is None
+        ):
             raise Exception("one of required params is None")
         return ucb_pne(
-            beta=beta, bounds=bounds, agent_dims_bounds=agent_dims_bounds, mode=mode, n_samples_outer=n_samples_outer
+            beta=beta,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=mode,
+            n_samples_outer=n_samples_outer,
         )
     elif acq_name == "ucb_mne":
         if domain is None or actions is None:
@@ -196,6 +205,10 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
         samples.append(noreg_sample)
 
         # Pick exploring samples
+        if mode == "DIRECT":
+            exploring_max_mode = "DIRECT"
+        else:
+            exploring_max_mode = "L-BFGS-B"
         for i in range(N):
             start_dim, end_dim = agent_dims_bounds[i]
             s_before = noreg_sample[:start_dim]
@@ -217,7 +230,7 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
                 ),
                 bounds=bounds[start_dim:end_dim],
                 rng=rng,
-                mode='DIRECT',
+                mode=exploring_max_mode,
                 n_warmup=100,
                 n_iter=5,
             )

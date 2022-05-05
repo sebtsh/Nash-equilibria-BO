@@ -5,7 +5,7 @@ from core.models import create_models
 from metrics.plotting import plot_models_2d
 
 
-def bo_loop_pne(
+def bo_loop_pne_discrete(
     init_data,
     observer,
     models,
@@ -59,6 +59,27 @@ def bo_loop_pne(
     return data
 
 
+def bo_loop_pne(
+    init_data, observer, acquisition, num_iters, kernel, noise_variance, rng
+):
+    data = init_data
+    sample_buffer = np.zeros((0, 0))
+    for t in trange(num_iters):
+        print(f"Iteration {t}")
+        if len(sample_buffer) == 0:
+            print("Refilling sample buffer")
+            models = create_models(
+                data=data, kernel=kernel, noise_variance=noise_variance
+            )
+            sample_buffer = acquisition(models=models, rng=rng)  # (n, N)
+        x_new = sample_buffer[0][None, :]
+        sample_buffer = np.delete(sample_buffer, 0, axis=0)
+        y_new = observer(x_new)
+        data = merge_data(data, (x_new, y_new))
+
+    return data
+
+
 def bo_loop_mne(
     init_data,
     observer,
@@ -68,6 +89,7 @@ def bo_loop_mne(
     noise_variance,
     actions,
     domain,
+    rng,
     plot=False,
     save_dir="",
 ):
@@ -81,6 +103,7 @@ def bo_loop_mne(
     :param noise_variance: float.
     :param actions:
     :param domain:
+    :param rng:
     :param plot: bool.
     :param save_dir: str.
     :return: Final dataset, tuple (X, Y).
@@ -96,7 +119,7 @@ def bo_loop_mne(
                 data=data, kernel=kernel, noise_variance=noise_variance
             )
             sample_buffer, strategy_buffer, prev_successes = acquisition(
-                models, prev_successes
+                models, prev_successes, rng
             )  # (n, N)
         x_new = sample_buffer[0][None, :]
         sample_buffer = np.delete(sample_buffer, 0, axis=0)

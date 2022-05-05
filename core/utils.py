@@ -116,7 +116,7 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10):
     d = len(bounds)
     neg_func_squeezed = lambda x: np.squeeze(-f(x[None, :]))
 
-    if mode == 'L-BFGS-B':
+    if mode == "L-BFGS-B":
         # Random sampling
         x_tries = rng.uniform(low=bounds[:, 0], high=bounds[:, 1], size=(n_warmup, d))
         f_x = f(x_tries)
@@ -139,8 +139,10 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10):
                 x_max = res.x
                 f_max = -res.fun
 
-    elif mode == 'DIRECT':
-        res = direct_minimize(func=neg_func_squeezed, bounds=bounds, algmethod=1, maxT=100)
+    elif mode == "DIRECT":
+        res = direct_minimize(
+            func=neg_func_squeezed, bounds=bounds, algmethod=1, maxT=100
+        )
         if not res.success:
             raise Exception("DIRECT failed in maximize_fn")
         x_max = res.x
@@ -224,6 +226,7 @@ def maxmin_fn(
                     ),
                     bounds=bounds[start_dim:end_dim],
                     rng=rng,
+                    mode="L-BFGS-B",
                     n_warmup=100,
                     n_iter=5,
                 )
@@ -239,8 +242,9 @@ def maxmin_fn(
         return samples[max_idx], max_val
 
     elif mode == "DIRECT":
+
         def obj(s):
-            #print("Calling inner obj")
+            # print("Calling inner obj")
             agent_max_inner_vals = []
             for i in range(N):
                 start_dim, end_dim = agent_dims_bounds[i]
@@ -268,10 +272,12 @@ def maxmin_fn(
             outer_vals = np.array(
                 [np.squeeze(outer_funcs[i](s[None, :])) for i in range(N)]
             )
-            #print("Finished inner obj")
+            # print("Finished inner obj")
             return np.max(np.array(agent_max_inner_vals) - outer_vals)
 
-        res = direct_minimize(func=obj, bounds=bounds, algmethod=1, maxT=n_samples_outer)
+        res = direct_minimize(
+            func=obj, bounds=bounds, algmethod=1, maxT=n_samples_outer
+        )
         if not res.success:
             raise Exception("DIRECT failed in maxmin_func")
 

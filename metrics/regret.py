@@ -2,10 +2,48 @@ import numpy as np
 
 from core.pne import best_response_payoff_pure
 from core.mne import neg_brp_mixed
-from core.utils import arr_index
+from core.utils import arr_index, maxmin_fn
+from core.pne import evaluate_sample
 
 
-def calc_regret_pne(u, data, domain, actions, response_dicts):
+def calc_regret_pne(u, data, bounds, agent_dims_bounds, mode, rng, n_samples_outer):
+    best_sample, best_val = maxmin_fn(
+        outer_funcs=u,
+        inner_funcs=u,
+        bounds=bounds,
+        agent_dims_bounds=agent_dims_bounds,
+        mode=mode,
+        rng=rng,
+        n_samples_outer=n_samples_outer,
+    )
+
+    X, _ = data
+    imm_regret = []
+    cumu_regret = []
+
+    if mode == "DIRECT":
+        maximize_mode = "DIRECT"
+    elif mode == "random":
+        maximize_mode = "L-BFGS-B"
+    else:
+        raise Exception("Incorrect mode passed to calc_regret_pne")
+    for x in X:
+        x_val = evaluate_sample(
+            s=x,
+            outer_funcs=u,
+            inner_funcs=u,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            rng=rng,
+            mode=maximize_mode,
+        )
+        imm_regret.append(best_val - x_val)
+        cumu_regret.append(np.sum(imm_regret))
+
+    return np.array(imm_regret), np.array(cumu_regret)
+
+
+def calc_regret_pne_discrete(u, data, domain, actions, response_dicts):
     X, _ = data
     brp = best_response_payoff_pure(
         u=u, S=domain, actions=actions, response_dicts=response_dicts
