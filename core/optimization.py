@@ -64,10 +64,8 @@ def bo_loop_pne(
 ):
     data = init_data
     sample_buffer = np.zeros((0, 0))
-    for t in trange(num_iters):
-        print(f"Iteration {t}")
+    for _ in trange(num_iters):
         if len(sample_buffer) == 0:
-            print("Refilling sample buffer")
             models = create_models(
                 data=data, kernel=kernel, noise_variance=noise_variance
             )

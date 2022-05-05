@@ -93,8 +93,8 @@ for mode in ["DIRECT", "random"]:
         inner_funcs=lcb_funcs,
         bounds=bounds,
         agent_dims_bounds=agent_dims_bounds,
-        mode='DIRECT',
-        rng=rng
+        mode="DIRECT",
+        rng=rng,
     )
     print(f"no-regret sample score: {res_score}")
     print(f"Mode {mode} took {end-start} seconds")
