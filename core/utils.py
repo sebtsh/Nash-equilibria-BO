@@ -286,3 +286,7 @@ def maxmin_fn(
 
     else:
         raise Exception("Incorrect mode passed to maxmin_fn")
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))

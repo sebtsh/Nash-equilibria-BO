@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 import gpflow as gpf
 import matplotlib
-from core.objectives import sample_GP_prior_utilities, noisy_observer
+from core.objectives import get_utilities, noisy_observer
 from core.optimization import bo_loop_pne
 from core.acquisitions import get_acquisition
 from core.utils import get_agent_dims_bounds
@@ -17,19 +17,37 @@ ex.observers.append(FileStorageObserver("../runs"))
 
 
 @ex.named_config
-def default():
+def randfunc():
     utility_name = "randfunc"
     acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
     agent_dims = [1, 1]  # this determines num_agents and dims
     lengthscale = 0.5
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
-    noise_variance = 0.1
+    noise_variance = 0.01
     num_init_points = 5
     num_iters = 200
     beta = 2.0
     maxmin_mode = "DIRECT"
     n_samples_outer = 10
     seed = 0
+    known_best_val = None
+
+
+@ex.named_config
+def gan():
+    utility_name = "gan"
+    acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
+    agent_dims = [2, 3]  # this determines num_agents and dims
+    lengthscale = 0.5
+    bound = [-1.0, 1.0]  # assumes same bounds for all dims
+    noise_variance = 0.01
+    num_init_points = 5
+    num_iters = 4
+    beta = 2.0
+    maxmin_mode = "random"
+    n_samples_outer = 10
+    seed = 0
+    known_best_val = 0.0
 
 
 @ex.automain
@@ -46,6 +64,7 @@ def main(
     maxmin_mode,
     n_samples_outer,
     seed,
+    known_best_val,
 ):
     args = dict(sorted(locals().items()))
     print(f"Running with parameters {args}")
@@ -60,8 +79,14 @@ def main(
     dir = "runs/" + utility_name + "/"
 
     kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
-    u = sample_GP_prior_utilities(
-        num_agents=num_agents, kernel=kernel, bounds=bounds, num_points=100, rng=rng
+    gan_sigma = 1.0
+    u = get_utilities(
+        utility_name=utility_name,
+        num_agents=num_agents,
+        bounds=bounds,
+        rng=rng,
+        kernel=kernel,
+        gan_sigma=gan_sigma,
     )
 
     observer = noisy_observer(u=u, noise_variance=noise_variance, rng=rng)
@@ -104,6 +129,7 @@ def main(
         mode=maxmin_mode,
         rng=rng,
         n_samples_outer=n_samples_outer,
+        known_best_val=known_best_val,
     )
 
     regrets_save_dir = dir + "regrets/"
@@ -156,16 +182,17 @@ def main(
     print(imm_regret[noreg_seq])
     print(cumu_regret[noreg_seq])
 
-    utils_save_dir = dir + "utils/"
-    plot_utilities_2d(
-        u=u,
-        bounds=bounds,
-        title="Utilities",
-        cmap="Spectral",
-        save=True,
-        save_dir=utils_save_dir,
-        filename="utilities",
-        show_plot=False,
-    )
+    if dims == 2:
+        utils_save_dir = dir + "utils/"
+        plot_utilities_2d(
+            u=u,
+            bounds=bounds,
+            title="Utilities",
+            cmap="Spectral",
+            save=True,
+            save_dir=utils_save_dir,
+            filename="utilities",
+            show_plot=False,
+        )
 
     print(f"Completed run {run_id} with parameters {args}")

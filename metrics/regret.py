@@ -6,16 +6,21 @@ from core.utils import arr_index, maxmin_fn
 from core.pne import evaluate_sample
 
 
-def calc_regret_pne(u, data, bounds, agent_dims_bounds, mode, rng, n_samples_outer):
-    best_sample, best_val = maxmin_fn(
-        outer_funcs=u,
-        inner_funcs=u,
-        bounds=bounds,
-        agent_dims_bounds=agent_dims_bounds,
-        mode=mode,
-        rng=rng,
-        n_samples_outer=n_samples_outer,
-    )
+def calc_regret_pne(
+    u, data, bounds, agent_dims_bounds, mode, rng, n_samples_outer, known_best_val=None
+):
+    if known_best_val is not None:
+        _, best_val = maxmin_fn(
+            outer_funcs=u,
+            inner_funcs=u,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=mode,
+            rng=rng,
+            n_samples_outer=n_samples_outer,
+        )
+    else:
+        best_val = known_best_val
 
     X, _ = data
     imm_regret = []
