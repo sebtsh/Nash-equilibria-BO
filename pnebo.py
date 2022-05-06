@@ -25,7 +25,7 @@ def randfunc():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.01
     num_init_points = 5
-    num_iters = 200
+    num_iters = 500
     beta = 2.0
     maxmin_mode = "DIRECT"
     n_samples_outer = 10
@@ -42,10 +42,10 @@ def gan():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.01
     num_init_points = 5
-    num_iters = 4
+    num_iters = 1000
     beta = 2.0
     maxmin_mode = "random"
-    n_samples_outer = 10
+    n_samples_outer = 12
     seed = 0
     known_best_val = 0.0
 

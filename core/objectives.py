@@ -20,8 +20,9 @@ def get_utilities(utility_name, num_agents, bounds, rng, kernel=None, gan_sigma=
             num_agents=num_agents, kernel=kernel, bounds=bounds, num_points=100, rng=rng
         )
     elif utility_name == "gan":
-        return standardize_utilities(u=gan_utilities(rng=rng, gan_sigma=gan_sigma),
-                                     bounds=bounds)
+        return standardize_utilities(
+            u=gan_utilities(rng=rng, gan_sigma=gan_sigma), bounds=bounds
+        )
     elif utility_name == "bcad":
         raise NotImplementedError
     else:
@@ -175,6 +176,8 @@ def standardize_utilities(u, bounds, num_samples=10000):
         stds.append(np.std(func_vals))
     standardized_utils = []
     for i in range(len(u)):
-        standardized_utils.append(lambda x, copy=i: (u[copy](x) - means[copy]) / stds[copy])
+        standardized_utils.append(
+            lambda x, copy=i: (u[copy](x) - means[copy]) / stds[copy]
+        )
 
     return standardized_utils
