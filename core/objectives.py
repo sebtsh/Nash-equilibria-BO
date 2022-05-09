@@ -13,9 +13,9 @@ def get_utilities(utility_name, num_agents, bounds, rng, kernel=None, gan_sigma=
     :param gan_sigma:
     :return: List of Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
     """
-    if utility_name == "randfunc":
+    if utility_name == "rand":
         if kernel is None:
-            raise Exception("kernel cannot be None for randfunc utility")
+            raise Exception("kernel cannot be None for rand utility")
         return sample_GP_prior_utilities(
             num_agents=num_agents, kernel=kernel, bounds=bounds, num_points=100, rng=rng
         )
@@ -24,7 +24,7 @@ def get_utilities(utility_name, num_agents, bounds, rng, kernel=None, gan_sigma=
             u=gan_utilities(rng=rng, gan_sigma=gan_sigma), bounds=bounds
         )
     elif utility_name == "bcad":
-        raise NotImplementedError
+        return bcad_utilities(rect_bounds=np.array([[-1.0, 1.0], [-1.0, 1.0]]), rng=rng)
     else:
         raise Exception("Incorrect utility_name passed to get_utilities")
 
@@ -181,3 +181,103 @@ def standardize_utilities(u, bounds, num_samples=10000):
         )
 
     return standardized_utils
+
+
+def sample_rectangle_2d(bounds, rng):
+    """
+    Samples a 2d rectangle of area 1 within bounds.
+    :param bounds: array of shape (dims, 2).
+    :param rng: NumPy rng object.
+    :return: tuple of (low_x1, high_x1, low_x2, high_x2).
+    """
+    min_x1, max_x1 = bounds[0]
+    min_x2, max_x2 = bounds[1]
+    max_length, max_height = bounds[:, 1] - bounds[:, 0]
+
+    # Sample length (x1)
+    low_x1 = rng.uniform(low=min_x1, high=max_x1 - 1 / max_height)
+    high_x1 = rng.uniform(low=low_x1 + 1 / max_height, high=max_x1)
+    x1_length = high_x1 - low_x1
+
+    # Sample height (x2)
+    x2_height = 1 / x1_length
+    low_x2 = rng.uniform(low=min_x2, high=max_x1 - x2_height)
+    high_x2 = low_x2 + x2_height
+
+    return low_x1, high_x1, low_x2, high_x2
+
+
+def bcad_utilities(rect_bounds, rng, m=20):
+    """
+    WARNING: Only works with two agents.
+    :param rect_bounds: array of shape (2, 2).
+    :param rng: NumPy rng object.
+    :param m: int.
+    :return: List of 2 Callables that each take in an array of shape (n, 6) and return an array of shape (n, 1).
+    """
+    margin = 1.0
+    rect = sample_rectangle_2d(rect_bounds, rng)
+    low_x1, high_x1, low_x2, high_x2 = rect
+
+    X_s = cross_product(
+        np.linspace(low_x1, high_x1, m)[:, None],
+        np.linspace(low_x2, high_x2, m)[:, None],
+    )
+
+    def g_func(X):
+        return (
+            0.25 * (X[..., 0:1] ** 2)
+            - 0.5 * (X[..., 0:1] * X[..., 1:2])
+            + 0.25 * (X[..., 1:2] ** 2)
+        )  # (..., 1)
+
+    def grad_g_func(X):
+        return 0.5 * np.concatenate(
+            [X[..., 0:1] - X[..., 1:2], -X[..., 0:1] + X[..., 1:2]], axis=-1
+        )  # (..., 2)
+
+    def g_linear_func(X, perturbed_X):
+        return (
+            g_func(X) + np.sum(grad_g_func(X) * (perturbed_X - X), axis=-1)[..., None]
+        )  # (..., 1)
+
+    def utility_attacker(params):
+        """
+        Deterministic estimate of attacker's utility. Negative of the defender's utility.
+        :param params: array of shape (n, 6).
+        :return: array of shape (n, 1).
+        """
+        v = params[:, :4]  # (n, 4)
+        d = params[:, 4:]  # (n, 2)
+
+        # Attacker's perturbations
+        signs = np.sign(g_func(X_s))  # (m ** 2, 1)
+        b_vals = np.concatenate(
+            [
+                v[:, 0:1, None] * X_s[:, 0:1] + v[:, 1:2, None] * X_s[:, 1:2],
+                v[:, 2:3, None] * X_s[:, 0:1] + v[:, 3:4, None] * X_s[:, 1:2],
+            ],
+            axis=-1,
+        )  # (n, m ** 2, 2)
+        b_vals_norm = np.linalg.norm(b_vals, axis=-1)[..., None]  # (n, m ** 2, 1)
+        # Some norms might be zero, so we change their norm to 1 to avoid division by zero. Perturbation will be zero
+        zero_indices = np.array(list(set(np.where(np.squeeze(b_vals_norm) == 0.0)[0])))
+        if len(zero_indices) != 0:
+            b_vals_norm[zero_indices] = 1.0
+
+        attacker_perturbs = -margin * signs * b_vals / b_vals_norm  # (n, m ** 2, 2)
+
+        # Defender's perturbations
+        defender_perturbs = np.expand_dims(d, axis=1)  # (n, 1, 2)
+
+        perturbed_X = X_s + attacker_perturbs + defender_perturbs  # (n, m ** 2, 2)
+        X_expanded = np.tile(X_s, (len(v), 1, 1))
+        g_L_vals = g_linear_func(X_expanded, perturbed_X)  # (n, m ** 2, 1)
+        g_vals = g_func(X_expanded)  # (n, m ** 2, 1)
+
+        func_signs = np.sign(g_vals)
+        perturbed_signs = np.sign(g_L_vals)
+
+        return np.mean(func_signs * perturbed_signs * -1, axis=1)  # (n, 1)
+
+    return [utility_attacker, lambda x: -utility_attacker(x)]

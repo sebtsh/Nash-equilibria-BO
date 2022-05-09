@@ -17,8 +17,8 @@ ex.observers.append(FileStorageObserver("../runs"))
 
 
 @ex.named_config
-def randfunc():
-    utility_name = "randfunc"
+def rand():
+    utility_name = "rand"
     acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
     agent_dims = [1, 1]  # this determines num_agents and dims
     lengthscale = 0.5
@@ -44,8 +44,25 @@ def gan():
     num_init_points = 5
     num_iters = 1000
     beta = 2.0
-    maxmin_mode = "random"
+    maxmin_mode = "DIRECT"
     n_samples_outer = 12
+    seed = 0
+    known_best_val = 0.0
+
+
+@ex.named_config
+def bcad():
+    utility_name = "bcad"
+    acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
+    agent_dims = [4, 2]  # this determines num_agents and dims
+    lengthscale = 0.5
+    bound = [-1.0, 1.0]  # assumes same bounds for all dims
+    noise_variance = 0.01
+    num_init_points = 5
+    num_iters = 1600
+    beta = 2.0
+    maxmin_mode = "DIRECT"
+    n_samples_outer = 13
     seed = 0
     known_best_val = 0.0
 
@@ -73,6 +90,7 @@ def main(
     num_agents = len(agent_dims)
     dims = np.sum(agent_dims)
     bounds = np.array([bound for _ in range(dims)])
+    agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
     ls = np.array([lengthscale] * dims)
     rng = np.random.default_rng(seed)
     tf.random.set_seed(seed)
@@ -95,7 +113,6 @@ def main(
     )
     init_data = (init_X, observer(init_X))
 
-    agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
     acq_func = get_acquisition(
         acq_name=acq_name,
         beta=beta,
