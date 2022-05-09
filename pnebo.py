@@ -128,7 +128,7 @@ def main(
         agent_dims_bounds=agent_dims_bounds,
         mode=maxmin_mode,
         rng=rng,
-        n_samples_outer=n_samples_outer,
+        n_samples_outer=n_samples_outer + 5,
         known_best_val=known_best_val,
     )
 
