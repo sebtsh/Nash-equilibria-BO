@@ -310,9 +310,14 @@ def lengthscale_test(f, bounds, num_samples=1000):
             X,
             np.linspace(bounds[i, 0], bounds[i, 1], num_discrete_each_dim)[:, None],
         )
+    print(X.shape)
+    print("Calculating y")
     y = f(X)
+    print("Finished calculating y")
     data = (X, y)
-    k = gpflow.kernels.SquaredExponential(lengthscales=np.array([1. for _ in range(dims)]))
+    k = gpflow.kernels.SquaredExponential(
+        lengthscales=np.array([1.0 for _ in range(dims)])
+    )
     m = gpf.models.GPR(data=data, kernel=k, mean_function=None)
     opt = gpflow.optimizers.Scipy()
     opt_logs = opt.minimize(

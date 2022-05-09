@@ -38,7 +38,7 @@ def gan():
     utility_name = "gan"
     acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
     agent_dims = [2, 3]  # this determines num_agents and dims
-    ls = np.array([0.5, 0.5, 2., 2., 2.])
+    ls = np.array([0.5, 0.5, 2.0, 2.0, 2.0])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
@@ -55,7 +55,7 @@ def bcad():
     utility_name = "bcad"
     acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
     agent_dims = [4, 2]  # this determines num_agents and dims
-    lengthscale = 0.5
+    ls = np.array([1.5, 0.75, 1.5, 0.75, 0.5, 0.5])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
