@@ -21,9 +21,9 @@ def rand():
     utility_name = "rand"
     acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
     agent_dims = [1, 1]  # this determines num_agents and dims
-    lengthscale = 0.5
+    ls = np.array([0.5] * sum(agent_dims))
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
-    noise_variance = 0.01
+    noise_variance = 0.001
     num_init_points = 5
     num_iters = 500
     beta = 2.0
@@ -38,9 +38,9 @@ def gan():
     utility_name = "gan"
     acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
     agent_dims = [2, 3]  # this determines num_agents and dims
-    lengthscale = 0.5
+    ls = np.array([0.5, 0.5, 2., 2., 2.])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
-    noise_variance = 0.01
+    noise_variance = 0.001
     num_init_points = 5
     num_iters = 1000
     beta = 2.0
@@ -57,7 +57,7 @@ def bcad():
     agent_dims = [4, 2]  # this determines num_agents and dims
     lengthscale = 0.5
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
-    noise_variance = 0.01
+    noise_variance = 0.001
     num_init_points = 5
     num_iters = 1600
     beta = 2.0
@@ -72,7 +72,7 @@ def main(
     utility_name,
     acq_name,
     agent_dims,
-    lengthscale,
+    ls,
     bound,
     noise_variance,
     num_init_points,
@@ -91,7 +91,6 @@ def main(
     dims = np.sum(agent_dims)
     bounds = np.array([bound for _ in range(dims)])
     agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
-    ls = np.array([lengthscale] * dims)
     rng = np.random.default_rng(seed)
     tf.random.set_seed(seed)
     dir = "runs/" + utility_name + "/"

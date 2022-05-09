@@ -1,4 +1,6 @@
 from itertools import chain, combinations
+import gpflow as gpf
+import gpflow.kernels
 import numpy as np
 from scipy.optimize import minimize
 from scipydirect import minimize as direct_minimize
@@ -290,3 +292,31 @@ def maxmin_fn(
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+
+def lengthscale_test(f, bounds, num_samples=1000):
+    """
+    Empirically suggests a good set of lengthscales for a function.
+    :param f: Callable that takes in an array of shape (n, d) and returns an array of shape (n, 1).
+    :param bounds: array of shape (d, 2).
+    :param num_samples: int.
+    :return: array of shape (d,). Lengthscales of each dimension.
+    """
+    dims = len(bounds)
+    num_discrete_each_dim = int(np.ceil(num_samples ** (1 / dims)))
+    X = np.linspace(bounds[0, 0], bounds[0, 1], num_discrete_each_dim)[:, None]
+    for i in range(1, dims):
+        X = cross_product(
+            X,
+            np.linspace(bounds[i, 0], bounds[i, 1], num_discrete_each_dim)[:, None],
+        )
+    y = f(X)
+    data = (X, y)
+    k = gpflow.kernels.SquaredExponential(lengthscales=np.array([1. for _ in range(dims)]))
+    m = gpf.models.GPR(data=data, kernel=k, mean_function=None)
+    opt = gpflow.optimizers.Scipy()
+    opt_logs = opt.minimize(
+        m.training_loss, m.trainable_variables, options=dict(maxiter=100)
+    )
+
+    return m.kernel.lengthscales.numpy(), opt_logs
