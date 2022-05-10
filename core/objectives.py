@@ -16,14 +16,19 @@ def get_utilities(utility_name, num_agents, bounds, rng, kernel=None, gan_sigma=
     if utility_name == "rand":
         if kernel is None:
             raise Exception("kernel cannot be None for rand utility")
-        return sample_GP_prior_utilities(
-            num_agents=num_agents, kernel=kernel, bounds=bounds, num_points=100, rng=rng
-        ), None
+        return (
+            sample_GP_prior_utilities(
+                num_agents=num_agents,
+                kernel=kernel,
+                bounds=bounds,
+                num_points=100,
+                rng=rng,
+            ),
+            None,
+        )
     elif utility_name == "gan":
         u, info = gan_utilities(rng=rng, gan_sigma=gan_sigma)
-        return standardize_utilities(
-            u=u, bounds=bounds, std=False
-        ), info
+        return standardize_utilities(u=u, bounds=bounds, std=False), info
     elif utility_name == "bcad":
         return bcad_utilities(rect_bounds=np.array([[-1.0, 1.0], [-1.0, 1.0]]), rng=rng)
     else:
@@ -278,7 +283,9 @@ def bcad_utilities(rect_bounds, rng, m=20):
         # Ensure perturbations are not larger than margin
         norms = np.linalg.norm(defender_perturbs, axis=-1)  # (n, 1)
         larger_idxs = np.where(norms > margin)[0]
-        defender_perturbs[larger_idxs] = defender_perturbs[larger_idxs] / norms[larger_idxs][..., None]
+        defender_perturbs[larger_idxs] = (
+            defender_perturbs[larger_idxs] / norms[larger_idxs][..., None]
+        )
 
         perturbed_X = X_s + attacker_perturbs + defender_perturbs  # (n, m ** 2, 2)
         X_expanded = np.tile(X_s, (len(v), 1, 1))

@@ -25,7 +25,7 @@ def rand():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 500
+    num_iters = 800
     beta = 2.0
     maxmin_mode = "DIRECT"
     n_samples_outer = 10
@@ -42,7 +42,7 @@ def gan():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 1000
+    num_iters = 1200
     beta = 2.0
     maxmin_mode = "DIRECT"
     n_samples_outer = 12
@@ -55,14 +55,14 @@ def bcad():
     utility_name = "bcad"
     acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
     agent_dims = [4, 2]  # this determines num_agents and dims
-    ls = np.array([1.5, 0.75, 1.5, 0.75, 0.5, 0.5])
+    ls = np.array([1.5, 0.5, 1.5, 0.5, 0.5, 0.5])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
     num_iters = 1600
     beta = 2.0
     maxmin_mode = "DIRECT"
-    n_samples_outer = 13
+    n_samples_outer = 15
     seed = 0
     known_best_val = 0.0
 
