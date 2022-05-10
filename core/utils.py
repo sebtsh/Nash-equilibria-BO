@@ -3,6 +3,7 @@ import gpflow as gpf
 import gpflow.kernels
 import numpy as np
 from scipy.optimize import minimize
+from scipy.stats import qmc
 from scipydirect import minimize as direct_minimize
 
 
@@ -325,3 +326,10 @@ def lengthscale_test(f, bounds, num_samples=1000):
     )
 
     return m.kernel.lengthscales.numpy(), opt_logs
+
+
+def sobol_sequence(num_points, bounds):
+    sampler = qmc.Sobol(d=len(bounds), scramble=False)
+    m = int(np.log2(num_points))
+    sample = sampler.random_base2(m=m)  # (2 ** m, d) points in [0, 1)
+    return sample * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]

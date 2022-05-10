@@ -4,7 +4,7 @@ import gpflow as gpf
 import matplotlib
 from core.objectives import get_utilities, noisy_observer
 from core.optimization import bo_loop_pne
-from core.acquisitions import get_acquisition
+from core.acquisitions import get_acq_pure
 from core.utils import get_agent_dims_bounds
 from metrics.regret import calc_regret_pne
 from metrics.plotting import plot_utilities_2d, plot_regret
@@ -96,14 +96,12 @@ def main(
     dir = "runs/" + utility_name + "/"
 
     kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
-    gan_sigma = 1.0
     u, _ = get_utilities(
         utility_name=utility_name,
         num_agents=num_agents,
         bounds=bounds,
         rng=rng,
         kernel=kernel,
-        gan_sigma=gan_sigma,
     )
 
     observer = noisy_observer(u=u, noise_variance=noise_variance, rng=rng)
@@ -112,7 +110,7 @@ def main(
     )
     init_data = (init_X, observer(init_X))
 
-    acq_func = get_acquisition(
+    acq_func = get_acq_pure(
         acq_name=acq_name,
         beta=beta,
         bounds=bounds,

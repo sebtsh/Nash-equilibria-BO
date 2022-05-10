@@ -1,6 +1,5 @@
 import itertools
 import numpy as np
-import pickle
 from scipy.optimize import minimize
 
 from core.utils import unif_in_simplex, sort_size_balance
@@ -316,17 +315,19 @@ def conditionally_dominated_var_utility(
         raise NotImplemented
 
 
-def SEM(U1, U2):
+def SEM(U1, U2, mode):
     """
     Runs the support-enumeration method (SEM) to find all mixed NEs.
     :param U1: Array of shape (M1, M2). Agent 1's utility matrix. Agent 1 row player, agent 2 column player.
     :param U2: Array of shape (M1, M2). Agent 2's utility matrix. Agent 1 row player, agent 2 column player.
+    :param mode: str. Either "all" or "first".
     :return: list of all MNEs.
     """
     M1, M2 = U1.shape
     pairs = [(x, y) for x in range(1, M1 + 1) for y in range(1, M2 + 1)]
     sorted_pairs = sort_size_balance(pairs)
     mnes = []
+    is_found = False
     for pair in sorted_pairs:
         s1_size, s2_size = pair
         all_s1 = itertools.combinations(np.arange(M1), s1_size)
@@ -361,7 +362,14 @@ def SEM(U1, U2):
                         success, res = tgs(constraints=cons, bounds=bounds)
                         if success:
                             mnes.append(res)
-    return mnes
+                            if mode == "first":
+                                is_found = True
+                                break
+            if mode == "first" and is_found:
+                break
+        if mode == "first" and is_found:
+            break
+    return mnes, []  # no prev_successes optimization for now
 
 
 def conditionally_dominated(p1actions, p2actions, active_agent, U1, U2):
@@ -426,8 +434,8 @@ def tgs(constraints, bounds):
     )
     if res.success:
         return True, res.x
-
-    return False, None
+    else:
+        return False, None
 
 
 def build_init_points(

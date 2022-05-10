@@ -85,8 +85,6 @@ def bo_loop_mne(
     num_iters,
     kernel,
     noise_variance,
-    actions,
-    domain,
     rng,
     plot=False,
     save_dir="",
@@ -125,20 +123,20 @@ def bo_loop_mne(
         data = merge_data(data, (x_new, y_new))
         chosen_strategies.append(strategy_buffer)
 
-        if plot:
-            plot_models_2d(
-                models=models,
-                xlims=(0, 1),
-                ylims=(0, 1),
-                actions=actions,
-                domain=domain,
-                X=data[0][t : t + 1],
-                title=f"GPs iter {t}",
-                cmap="Spectral",
-                save=True,
-                save_dir=save_dir,
-                filename=f"gps_{t}",
-                show_plot=False,
-            )
+        # if plot:
+        #     plot_models_2d(
+        #         models=models,
+        #         xlims=(0, 1),
+        #         ylims=(0, 1),
+        #         actions=actions,
+        #         domain=domain,
+        #         X=data[0][t : t + 1],
+        #         title=f"GPs iter {t}",
+        #         cmap="Spectral",
+        #         save=True,
+        #         save_dir=save_dir,
+        #         filename=f"gps_{t}",
+        #         show_plot=False,
+        #     )
 
     return data, chosen_strategies

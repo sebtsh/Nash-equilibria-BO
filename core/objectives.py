@@ -2,7 +2,7 @@ import numpy as np
 from core.utils import sigmoid, cross_product
 
 
-def get_utilities(utility_name, num_agents, bounds, rng, kernel=None, gan_sigma=None):
+def get_utilities(utility_name, num_agents, bounds, rng, kernel=None, gan_sigma=1.0):
     """
     Get utility function of each agent.
     :param utility_name:
