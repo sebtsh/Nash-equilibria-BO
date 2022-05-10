@@ -234,12 +234,12 @@ def bcad_utilities(rect_bounds, rng, m=20):
         return (
             0.25 * (X[..., 0:1] ** 2)
             - 0.5 * (X[..., 0:1] * X[..., 1:2])
-            + 0.25 * (X[..., 1:2] ** 2)
+            - 0.25 * (X[..., 1:2] ** 2)
         )  # (..., 1)
 
     def grad_g_func(X):
         return 0.5 * np.concatenate(
-            [X[..., 0:1] - X[..., 1:2], -X[..., 0:1] + X[..., 1:2]], axis=-1
+            [X[..., 0:1] - X[..., 1:2], -X[..., 0:1] - X[..., 1:2]], axis=-1
         )  # (..., 2)
 
     def g_linear_func(X, perturbed_X):
