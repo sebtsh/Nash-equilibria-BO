@@ -257,34 +257,38 @@ def ucb_mne(beta, domain, M):
         mne = mne_list[0]
         (s1, s2), (a1supp, a2supp) = get_strategies_and_support(mne, M, M)
 
-        samples_coords = cross_product(a1supp[:, None], a2supp[:, None])
-        print(f"noreg samples: {samples_coords}")
-        exploring_samples_coords = []
-        for a1 in a1supp:
-            a1_ucb = U2upper[a1]  # Given a1, can agent 2 do better?
-            a1_ucb_argmax_a2coord = np.argmax(a1_ucb)
-            if (
-                a1_ucb_argmax_a2coord not in a2supp
-            ):  # if it is, we would already have sampled this
-                exploring_samples_coords.append([a1, a1_ucb_argmax_a2coord])
-        for a2 in a2supp:
-            a2_ucb = U1upper[:, a2]  # Given a2, can agent 1 do better?
-            a2_ucb_argmax_a1coord = np.argmax(a2_ucb)
-            if (
-                a2_ucb_argmax_a1coord not in a1supp
-            ):  # if it is, we would already have sampled this
-                exploring_samples_coords.append([a2_ucb_argmax_a1coord, a2])
+        noreg_samples_coords = cross_product(a1supp[:, None], a2supp[:, None])
+        # Take the noreg sample with the highest uncertainty
+        final_idxs = []
+        noreg_idxs = noreg_samples_coords[:, 0] * M + noreg_samples_coords[:, 1]  # (c,)
+        noreg_ci_vals = ucb_funcs[0](domain[noreg_idxs]) - lcb_funcs[0](
+            domain[noreg_idxs]
+        )  # (c, 1)
+        noreg_final_idx = noreg_idxs[np.argmax(noreg_ci_vals[:, 0])]
+        final_idxs.append(noreg_final_idx)
 
-        print(f"exploring samples: {exploring_samples_coords}")
-        if len(exploring_samples_coords) != 0:
-            all_coords = np.concatenate(
-                [samples_coords, np.array(exploring_samples_coords)], axis=0
-            )  # (B, 2)
-        else:
-            all_coords = samples_coords
-        all_domain_idxs = all_coords[:, 0] * M + all_coords[:, 1]
+        # Exploring samples
+        a1_ucb_br_coord = np.argmax(U1upper @ s2)
+        a2_ucb_br_coord = np.argmax(s1 @ U2upper)
+        a1_exp_coords = cross_product(np.array([[a1_ucb_br_coord]]), a2supp[:, None])
+        a2_exp_coords = cross_product(a1supp[:, None], np.array([[a2_ucb_br_coord]]))
+        a1_exp_idxs = a1_exp_coords[:, 0] * M + a1_exp_coords[:, 1]  # (c,)
+        a2_exp_idxs = a2_exp_coords[:, 0] * M + a2_exp_coords[:, 1]  # (c,)
+        a1_exp_ci_vals = ucb_funcs[0](domain[a1_exp_idxs]) - lcb_funcs[0](
+            domain[a1_exp_idxs]
+        )  # (c, 1)
+        a2_exp_ci_vals = ucb_funcs[0](domain[a2_exp_idxs]) - lcb_funcs[0](
+            domain[a2_exp_idxs]
+        )  # (c, 1)
+        a1_final_idx = a1_exp_idxs[np.argmax(a1_exp_ci_vals[:, 0])]
+        a2_final_idx = a2_exp_idxs[np.argmax(a2_exp_ci_vals[:, 0])]
+        final_idxs.append(a1_final_idx)
+        final_idxs.append(a2_final_idx)
 
-        return domain[all_domain_idxs], (s1, s2), prev_successes
+        samples = domain[np.array(final_idxs)]
+        print(f"Samples: {samples}")
+
+        return samples, (s1, s2), prev_successes
 
     return acq
 

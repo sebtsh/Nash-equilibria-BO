@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import gpflow as gpf
 import matplotlib
+import pickle
 from core.objectives import get_utilities, noisy_observer
 from core.optimization import bo_loop_pne
 from core.acquisitions import get_acq_pure
@@ -10,16 +11,17 @@ from metrics.regret import calc_regret_pne
 from metrics.plotting import plot_utilities_2d, plot_regret
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
+from pathlib import Path
 
 matplotlib.use("Agg")
-ex = Experiment("NashBO")
-ex.observers.append(FileStorageObserver("../runs"))
+ex = Experiment("NashBO-PNE")
+ex.observers.append(FileStorageObserver("./runs"))
 
 
 @ex.named_config
 def rand():
     utility_name = "rand"
-    acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
+    acq_name = "ucb_pne"
     agent_dims = [1, 1]  # this determines num_agents and dims
     ls = np.array([0.5] * sum(agent_dims))
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
@@ -36,7 +38,7 @@ def rand():
 @ex.named_config
 def gan():
     utility_name = "gan"
-    acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
+    acq_name = "ucb_pne"
     agent_dims = [2, 3]  # this determines num_agents and dims
     ls = np.array([0.5, 0.5, 2.0, 2.0, 2.0])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
@@ -53,7 +55,7 @@ def gan():
 @ex.named_config
 def bcad():
     utility_name = "bcad"
-    acq_name = "ucb_pne"  # 'ucb_pne_naive', 'ucb_pne'
+    acq_name = "ucb_pne"
     agent_dims = [4, 2]  # this determines num_agents and dims
     ls = np.array([1.5, 0.5, 1.5, 0.5, 0.5, 0.5])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
@@ -93,7 +95,8 @@ def main(
     agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
     rng = np.random.default_rng(seed)
     tf.random.set_seed(seed)
-    dir = "runs/" + utility_name + "/"
+    dir = "results/pne/" + utility_name + "/"
+    filename = f"pne-{utility_name}-{acq_name}-seed{seed}"
 
     kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
     u, _ = get_utilities(
@@ -147,14 +150,13 @@ def main(
     )
 
     regrets_save_dir = dir + "regrets/"
-
     plot_regret(
         regret=imm_regret,
         num_iters=num_iters,
         title="Immediate regret (all samples)",
         save=True,
         save_dir=regrets_save_dir,
-        filename="imm-all",
+        filename=filename + "-imm",
     )
     plot_regret(
         regret=cumu_regret,
@@ -162,7 +164,7 @@ def main(
         title="Cumulative regret (all samples)",
         save=True,
         save_dir=regrets_save_dir,
-        filename="cumu-all",
+        filename=filename + "-cumu",
     )
 
     noreg_seq = np.array(
@@ -178,7 +180,7 @@ def main(
         title="Immediate regret (no-regret sequence)",
         save=True,
         save_dir=regrets_save_dir,
-        filename="imm-noregseq",
+        filename=filename + "-immnoreg",
     )
     plot_regret(
         regret=cumu_regret[noreg_seq],
@@ -186,7 +188,7 @@ def main(
         title="Cumulative regret (no-regret sequence)",
         save=True,
         save_dir=regrets_save_dir,
-        filename="cumu-noregseq",
+        filename=filename + "-cumunoreg",
     )
 
     print("Regrets of all samples")
@@ -208,5 +210,12 @@ def main(
             filename="utilities",
             show_plot=False,
         )
+
+    pickles_save_dir = dir + "pickles/"
+    Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
+    pickle.dump(
+        (final_data, imm_regret, cumu_regret),
+        open(pickles_save_dir + f"{filename}.p", "wb"),
+    )
 
     print(f"Completed run {run_id} with parameters {args}")
