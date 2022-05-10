@@ -18,11 +18,12 @@ def get_utilities(utility_name, num_agents, bounds, rng, kernel=None, gan_sigma=
             raise Exception("kernel cannot be None for rand utility")
         return sample_GP_prior_utilities(
             num_agents=num_agents, kernel=kernel, bounds=bounds, num_points=100, rng=rng
-        )
+        ), None
     elif utility_name == "gan":
+        u, info = gan_utilities(rng=rng, gan_sigma=gan_sigma)
         return standardize_utilities(
-            u=gan_utilities(rng=rng, gan_sigma=gan_sigma), bounds=bounds
-        )
+            u=u, bounds=bounds, std=False
+        ), info
     elif utility_name == "bcad":
         return bcad_utilities(rect_bounds=np.array([[-1.0, 1.0], [-1.0, 1.0]]), rng=rng)
     else:
@@ -127,7 +128,7 @@ def gan_utilities(rng, gan_sigma, m=100):
 
         return np.expand_dims(real_score + fake_score, axis=-1)
 
-    return [utility_gen, utility_dis]
+    return [utility_gen, utility_dis], (w_real, z)
 
 
 def noisy_observer(u, noise_variance, rng):
@@ -152,12 +153,13 @@ def noisy_observer(u, noise_variance, rng):
     return observer
 
 
-def standardize_utilities(u, bounds, num_samples=10000):
+def standardize_utilities(u, bounds, num_samples=10000, std=True):
     """
     Produces new utility functions that are approximately standardized for easier learning with GPs.
     :param u: List of Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
     :param bounds:
     :param num_samples: int.
+    :param std: bool. Divide by standard deviation or not.
     :return: List of Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
     """
     dims = len(bounds)
@@ -175,10 +177,14 @@ def standardize_utilities(u, bounds, num_samples=10000):
         means.append(np.mean(func_vals))
         stds.append(np.std(func_vals))
     standardized_utils = []
+
     for i in range(len(u)):
-        standardized_utils.append(
-            lambda x, copy=i: (u[copy](x) - means[copy]) / stds[copy]
-        )
+        if std:
+            standardized_utils.append(
+                lambda x, copy=i: (u[copy](x) - means[copy]) / stds[copy]
+            )
+        else:
+            standardized_utils.append(lambda x, copy=i: u[copy](x) - means[copy])
 
     return standardized_utils
 
@@ -280,4 +286,4 @@ def bcad_utilities(rect_bounds, rng, m=20):
 
         return np.mean(func_signs * perturbed_signs * -1, axis=1)  # (n, 1)
 
-    return [utility_attacker, lambda x: -utility_attacker(x)]
+    return [utility_attacker, lambda x: -utility_attacker(x)], (rect, X_s)

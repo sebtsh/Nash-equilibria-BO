@@ -97,7 +97,7 @@ def main(
 
     kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
     gan_sigma = 1.0
-    u = get_utilities(
+    u, _ = get_utilities(
         utility_name=utility_name,
         num_agents=num_agents,
         bounds=bounds,
