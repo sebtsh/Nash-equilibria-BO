@@ -275,6 +275,10 @@ def bcad_utilities(rect_bounds, rng, m=20):
 
         # Defender's perturbations
         defender_perturbs = np.expand_dims(d, axis=1)  # (n, 1, 2)
+        # Ensure perturbations are not larger than margin
+        norms = np.linalg.norm(defender_perturbs, axis=-1)  # (n, 1)
+        larger_idxs = np.where(norms > margin)[0]
+        defender_perturbs[larger_idxs] = defender_perturbs[larger_idxs] / norms[larger_idxs][..., None]
 
         perturbed_X = X_s + attacker_perturbs + defender_perturbs  # (n, m ** 2, 2)
         X_expanded = np.tile(X_s, (len(v), 1, 1))
