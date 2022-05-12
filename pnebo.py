@@ -182,8 +182,11 @@ def main(
         save_dir=regrets_save_dir,
         filename=filename + "-immnoreg",
     )
+    noreg_cumu_regret = []
+    for i in range(len(noreg_seq)):
+        noreg_cumu_regret.append(np.sum(imm_regret[noreg_seq][: i + 1]))
     plot_regret(
-        regret=cumu_regret[noreg_seq],
+        regret=noreg_cumu_regret,
         num_iters=len(noreg_seq),
         title="Cumulative regret (no-regret sequence)",
         save=True,

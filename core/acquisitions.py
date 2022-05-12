@@ -253,7 +253,9 @@ def ucb_mne(beta, domain, M):
         U1_sample = rng.uniform(low=U1lower, high=U1upper)
         U2_sample = rng.uniform(low=U2lower, high=U2upper)
 
-        mne_list, prev_successes = SEM(U1=U1_sample, U2=U2_sample, mode="first")
+        mne_list, prev_successes = SEM(
+            U1=U1_sample, U2=U2_sample, mode="first", prev_successes=prev_successes
+        )
         mne = mne_list[0]
         (s1, s2), (a1supp, a2supp) = get_strategies_and_support(mne, M, M)
 
@@ -286,7 +288,7 @@ def ucb_mne(beta, domain, M):
         final_idxs.append(a2_final_idx)
 
         samples = domain[np.array(final_idxs)]
-        print(f"Samples: {samples}")
+        # print(f"Samples: {samples}")
 
         return samples, (s1, s2), prev_successes
 

@@ -272,7 +272,9 @@ def bcad_utilities(rect_bounds, rng, m=20):
         )  # (n, m ** 2, 2)
         b_vals_norm = np.linalg.norm(b_vals, axis=-1)[..., None]  # (n, m ** 2, 1)
         # Some norms might be zero, so we change their norm to 1 to avoid division by zero. Perturbation will be zero
-        zero_indices = np.array(list(set(np.where(np.squeeze(b_vals_norm) == 0.0)[0])))
+        zero_indices = np.array(
+            list(set(np.where(np.squeeze(b_vals_norm, axis=-1) == 0.0)[0]))
+        )
         if len(zero_indices) != 0:
             b_vals_norm[zero_indices] = 1.0
 

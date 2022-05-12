@@ -110,6 +110,7 @@ def bo_loop_mne(
     strategy_buffer = None
     prev_successes = []
     for t in trange(num_iters):
+        # print(f"prev_successes: {prev_successes}")
         if len(sample_buffer) == 0:
             models = create_models(
                 data=data, kernel=kernel, noise_variance=noise_variance
