@@ -57,31 +57,43 @@ def arr_index(array, item):
             return idx
 
 
-def all_equal_except_i(s1, s2, i):
-    N = len(s1)
-    is_all_equal = True
-    for j in range(N):
-        if j != i and s1[j] != s2[j]:
-            is_all_equal = False
-    return is_all_equal
-
-
-def create_response_dict(domain, i):
+def all_equal_except_i(i, s_idx, action_idxs):
     """
-    Creates a dictionary with keys that are the bytes of a length N array, and returns the idxs of domain that have
+
+    :param i: int. Agent to vary actions.
+    :param s_idx: Array of shape num_agents. Strategy profile expressed in terms of action indices.
+    :param action_idxs: Array of shape num_actions.
+    :return: Array of shape num_actions, corresponding to domain indices in which agent i's action is varied and
+    all other agents' actions stay the same.
+    """
+    num_agents = len(s_idx)
+    num_actions = len(action_idxs)
+    response_domain_idxs = 0
+    for j in range(num_agents):
+        factor = num_agents - j - 1
+        if j == i:
+            response_domain_idxs += action_idxs * num_actions**factor
+        else:
+            response_domain_idxs += s_idx[j] * num_actions**factor
+    return response_domain_idxs
+
+
+def create_response_dict(i, domain, domain_in_idxs, action_idxs):
+    """
+    Creates a dictionary with keys that are the bytes of a length dims array, and returns the idxs of domain that have
     the actions of all other agents except i the same.
-    :param domain: array of shape (M ** N, N).
-    :param i: int.
+    :param i: int. Agent for whom we are creating the response dict.
+    :param domain: array of shape (M ** N, dims). All strategy profiles in input space.
+    :param domain_in_idxs: array of shape (M ** N, num_agents). All strategy profiles expressed as indices of each
+    agent's actions.
+    :param action_idxs:
+    :param agent_dims_bounds: list of N tuples (start_dim, end_dim) for each agent.
     :return: dict.
     """
     _, N = domain.shape
     dic = {}
-    for s in domain:
-        idxs = []
-        for idx, t in enumerate(domain):
-            if all_equal_except_i(s, t, i):
-                idxs.append(idx)
-        dic[s.tobytes()] = idxs
+    for t, s in enumerate(domain):
+        dic[s.tobytes()] = all_equal_except_i(i, domain_in_idxs[t], action_idxs)
     return dic
 
 
@@ -333,3 +345,16 @@ def sobol_sequence(num_points, bounds):
     m = int(np.log2(num_points))
     sample = sampler.random_base2(m=m)  # (2 ** m, d) points in [0, 1)
     return sample * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]
+
+
+def discretize_domain(num_agents, num_actions, bounds, agent_dims):
+    agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
+    start_dim, end_dim = agent_dims_bounds[0]
+    domain = sobol_sequence(num_points=num_actions, bounds=bounds[start_dim:end_dim])
+    for i in range(1, num_agents):
+        start_dim, end_dim = agent_dims_bounds[i]
+        domain = cross_product(
+            domain,
+            sobol_sequence(num_points=num_actions, bounds=bounds[start_dim:end_dim]),
+        )
+    return domain

@@ -1,6 +1,6 @@
 import numpy as np
 
-from core.pne import best_response_payoff_pure
+from core.pne import best_response_payoff_pure_discrete
 from core.mne import neg_brp_mixed
 from core.utils import arr_index, maxmin_fn
 from core.pne import evaluate_sample
@@ -50,8 +50,8 @@ def calc_regret_pne(
 
 def calc_regret_pne_discrete(u, data, domain, actions, response_dicts):
     X, _ = data
-    brp = best_response_payoff_pure(
-        u=u, S=domain, actions=actions, response_dicts=response_dicts
+    brp = best_response_payoff_pure_discrete(
+        u=u, domain=domain, num_actions=len(actions), response_dicts=response_dicts
     )  # (M ** N, N)
     strategy_eps = np.max(brp, axis=-1)
     best = np.min(strategy_eps)

@@ -4,7 +4,7 @@ import gpflow as gpf
 import pickle
 import matplotlib
 from core.objectives import get_utilities, noisy_observer
-from core.utils import cross_product, sobol_sequence, get_agent_dims_bounds
+from core.utils import get_agent_dims_bounds, discretize_domain
 from core.optimization import bo_loop_mne
 from core.acquisitions import get_acq_mixed
 from core.mne import SEM, neg_brp_mixed
@@ -91,16 +91,12 @@ def main(
     dir = "results/mne/" + utility_name + "/"
     filename = f"mne-{utility_name}-{acq_name}-seed{seed}"
 
-    bounds = np.array([bound for _ in range(dims)])
-    agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
-    start_dim, end_dim = agent_dims_bounds[0]
-    domain = sobol_sequence(num_points=num_actions, bounds=bounds[start_dim:end_dim])
-    for i in range(1, num_agents):
-        start_dim, end_dim = agent_dims_bounds[i]
-        domain = cross_product(
-            domain,
-            sobol_sequence(num_points=num_actions, bounds=bounds[start_dim:end_dim]),
-        )
+    domain = discretize_domain(
+        num_agents=num_agents,
+        num_actions=num_actions,
+        bounds=bounds,
+        agent_dims=agent_dims,
+    )
 
     kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
 

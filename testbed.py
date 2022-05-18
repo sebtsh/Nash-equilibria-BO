@@ -1,240 +1,109 @@
 import numpy as np
-from scipy.optimize import minimize
-from core.mne import (
-    build_tgs_constraints,
-    build_tgs_constraints_var_utility,
-    build_init_points,
-    tgs,
-    tgs_var_utility,
-    SEM,
-    SEM_var_utility,
-    get_strategies_and_support,
-    evaluate_support,
+import tensorflow as tf
+import gpflow as gpf
+import matplotlib
+import pickle
+from core.objectives import get_utilities, noisy_observer
+from core.optimization import bo_loop_pne
+from core.acquisitions import get_acq_pure
+from core.utils import (
+    get_agent_dims_bounds,
+    discretize_domain,
+    create_response_dict,
+    cross_product,
+    sobol_sequence,
+)
+from core.pne import find_PNE_discrete, best_response_payoff_pure_discrete
+from core.models import create_models
+from metrics.regret import calc_regret_pne
+from metrics.plotting import plot_utilities_2d, plot_utilities_2d_discrete, plot_regret
+from sacred import Experiment
+from sacred.observers import FileStorageObserver
+from pathlib import Path
+
+utility_name = "rand"
+acq_name = "ucb_pne"
+agent_dims = [2, 2]  # this determines num_agents and dims
+ls = np.array([0.5] * sum(agent_dims))
+bound = [-1.0, 1.0]  # assumes same bounds for all dims
+noise_variance = 0.001
+num_init_points = 400
+num_iters = 800
+beta = 2.0
+maxmin_mode = "DIRECT"
+n_samples_outer = 10
+seed = 0
+known_best_val = None
+num_actions_discrete = (
+    64  # for acquisition functions that require discretization, i.e. prob_eq and SUR
 )
 
-rng = np.random.default_rng(0)
-M1 = 3
-M2 = 2
-N = 2  # num_players
+num_agents = len(agent_dims)
+dims = np.sum(agent_dims)
+bounds = np.array([bound for _ in range(dims)])
+agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
+rng = np.random.default_rng(seed)
+tf.random.set_seed(seed)
+dir = "results/pne/" + utility_name + "/"
+filename = f"pne-{utility_name}-{acq_name}-seed{seed}"
 
-U1lower = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) - 1
-U1upper = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) + 1
-U2lower = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]]) - 1
-U2upper = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]]) + 1
-
-all_res, _ = SEM_var_utility(
-    U1upper,
-    U1lower,
-    U2upper,
-    U2lower,
-    num_rand_dists_per_agent=5,
+kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
+u, _ = get_utilities(
+    utility_name=utility_name,
+    num_agents=num_agents,
+    bounds=bounds,
     rng=rng,
-    mode="all",
-    prev_successes=[],
-    evaluation_mode="linear_with_sampling",
-    num_samples=10,
+    kernel=kernel,
 )
-u1start = M1 + M2 + 2
-u2start = u1start + M1 * M2
-for res in all_res:
-    (s1, s2), (a1supp, a2supp) = get_strategies_and_support(res, M1, M2)
-    print((s1, s2), (a1supp, a2supp))
-    print(f"Agent 1 strategy: {res[:M1]}, with value {res[M1]}")
-    print(f"Agent 2 strategy: {res[M1 + 1:M1 + M2 + 1]}, with value {res[M1 + M2 + 1]}")
-    print(f"U1: {np.reshape(res[u1start:u1start + M1 * M2], (M1, M2))}")
-    print(f"U2: {np.reshape(res[u2start:u2start + M2 * M1], (M2, M1)).T}")
-    print("==============")
 
+# Discretize the domain
+domain = discretize_domain(
+    num_agents=num_agents,
+    num_actions=num_actions_discrete,
+    bounds=bounds,
+    agent_dims=agent_dims,
+)
+# Create response_dicts
+print("Creating response dicts")
+action_idxs = np.arange(num_actions_discrete)
+domain_in_idxs = action_idxs[:, None]
+for i in range(1, num_agents):
+    domain_in_idxs = cross_product(domain_in_idxs, action_idxs[:, None])
+response_dicts = [
+    create_response_dict(i, domain, domain_in_idxs, action_idxs)
+    for i in range(len(agent_dims))
+]
 
-##################################################
+# Just for this discrete test, the init_X must be sampled from domain
+observer = noisy_observer(u=u, noise_variance=noise_variance, rng=rng)
+init_idxs = rng.integers(low=0, high=len(domain), size=num_init_points)
+init_X = domain[init_idxs]
+init_data = (init_X, observer(init_X))
 
-# rng = np.random.default_rng(0)
-# M1 = 3
-# M2 = 2
-# N = 2  # num_players
-#
-# # U1lower = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]])
-# # U1upper = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]])
-# # U2lower = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]])
-# # U2upper = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]])
-#
-# U1lower = np.array([[0.0, 1.0, -1.0], [-1.0, 0.0, 1], [1.0, -1.0, 0]]) - 0.01
-# U1upper = np.array([[0.0, 1.0, -1.0], [-1.0, 0.0, 1], [1.0, -1.0, 0]]) + 0.01
-# U2lower = np.array([[0.0, -1.0, 1.0], [1.0, 0.0, -1], [-1.0, 1.0, 0]]) - 0.01
-# U2upper = np.array([[0.0, -1.0, 1.0], [1.0, 0.0, -1], [-1.0, 1.0, 0]]) + 0.01
-#
-#
-# # print("U1upper")
-# # print(U1upper)
-# # print("U1lower")
-# # print(U1lower)
-# # print("U2upper")
-# # print(U2upper)
-# # print("U2lower")
-# # print(U2lower)
-#
-# # from core.utils import sort_size_balance
-# # import itertools
-# # from core.mne import conditionally_dominated_var_utility
-# # pairs = [(x, y) for x in range(1, M1 + 1) for y in range(1, M2 + 1)]
-# # sorted_pairs = sort_size_balance(pairs)
-# # mnes = []
-# # for pair in sorted_pairs:
-# #     s1_size, s2_size = pair
-# #     all_s1 = itertools.combinations(np.arange(M1), s1_size)
-# #     for s1 in all_s1:
-# #         all_s2 = itertools.combinations(np.arange(M2), s2_size)
-# #         for s2 in all_s2:
-# #             print(f"s1:{s1}, s2:{s2}")
-# #             print("Agent 1:")
-# #             print(conditionally_dominated_var_utility(p1actions=s1,
-# #                                                       p2actions=s2,
-# #                                                       active_agent=1,
-# #                                                       U1upper=U1upper,
-# #                                                       U1lower=U1lower,
-# #                                                       U2upper=U2upper,
-# #                                                       U2lower=U2lower))
-# #             print("Agent 2:")
-# #             print(conditionally_dominated_var_utility(p1actions=s1,
-# #                                                       p2actions=s2,
-# #                                                       active_agent=2,
-# #                                                       U1upper=U1upper,
-# #                                                       U1lower=U1lower,
-# #                                                       U2upper=U2upper,
-# #                                                       U2lower=U2lower))
-# #             print("=======")
-#
-# all_res = SEM_var_utility(
-#     U1upper,
-#     U1lower,
-#     U2upper,
-#     U2lower,
-#     num_rand_dists_per_agent=5,
-#     rng=rng,
-#     mode="all",
-# )
-# u1start = M1 + M2 + 2
-# u2start = u1start + M1 * M2
-# for res in all_res:
-#     (s1, s2), (a1supp, a2supp) = get_strategies_and_support(res, M1, M2)
-#     print((s1, s2), (a1supp, a2supp))
-#     print(f"Agent 1 strategy: {res[:M1]}, with value {res[M1]}")
-#     print(f"Agent 2 strategy: {res[M1 + 1:M1 + M2 + 1]}, with value {res[M1 + M2 + 1]}")
-#     print(f"U1: {np.reshape(res[u1start:u1start + M1 * M2], (M1, M2))}")
-#     print(f"U2: {np.reshape(res[u2start:u2start + M2 * M1], (M2, M1)).T}")
-#     print("==============")
+print("Finding PNE")
+brp = best_response_payoff_pure_discrete(
+    u=u, domain=domain, num_actions=num_actions_discrete, response_dicts=response_dicts
+)
+pne = find_PNE_discrete(
+    u=u, domain=domain, num_actions=num_actions_discrete, response_dicts=response_dicts
+)
+print(
+    f"PNE at {pne} with idx {np.argmin(np.max(brp, axis=-1))} and brp {brp[np.argmin(np.max(brp, axis=-1))]}"
+)
 
-####################################################
+models = create_models(data=init_data, kernel=kernel, noise_variance=noise_variance)
+from core.acquisitions import prob_eq
 
-# rng = np.random.default_rng(0)
-# M1 = 3
-# M2 = 2
-# N = 2  # num_players
-#
-# U1 = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]])
-# U2 = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]])
-#
-# # M1 = 3
-# # M2 = 3
-# # N = 2  # num_players
-# #
-# # U1 = np.array([[0.0, 1.0, -1.0], [-1.0, 0.0, 1], [1.0, -1.0, 0]])
-# # U2 = np.array([[0.0, -1.0, 1.0], [1.0, 0.0, -1], [-1.0, 1.0, 0]])
-#
-# all_res = SEM(M1, M2, U1, U2)
-#
-# for res in all_res:
-#     print(f"Agent 1 strategy: {res[:M1]}, with value {res[M1]}")
-#     print(f"Agent 2 strategy: {res[M1 + 1:M1 + M2 + 1]}, with value {res[M1 + M2 + 1]}")
-#     print("==============")
-
-
-########################################################
-
-# U1lower = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) - 0.01
-# U1upper = np.array([[0.0, 6.0], [2.0, 5.0], [3.0, 3.0]]) + 0.01
-# U2lower = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]]) - 0.01
-# U2upper = np.array([[1.0, 0.0], [0.0, 2.0], [4.0, 3.0]]) + 0.01
-#
-# # U1lower = np.zeros((3, 2)) - rng.normal(0.5, 0.5, (3, 2))
-# # U1upper = np.ones((3, 2)) + rng.normal(0.5, 0.5, (3, 2))
-# # U2lower = np.zeros((3, 2)) - rng.normal(0.5, 0.5, (3, 2))
-# # U2upper = np.ones((3, 2)) + rng.normal(0.5, 0.5, (3, 2))
-#
-# s1 = np.array([1, 2])
-# s2 = np.array([0, 1])
-# cons, bounds = build_tgs_constraints_var_utility(
-#     M1=M1,
-#     M2=M2,
-#     s1=s1,
-#     s2=s2,
-#     U1upper=U1upper,
-#     U1lower=U1lower,
-#     U2upper=U2upper,
-#     U2lower=U2lower,
-# )
-#
-# init_points = build_init_points(
-#     M1=M1,
-#     M2=M2,
-#     s1=s1,
-#     s2=s2,
-#     U1upper=U1upper,
-#     U1lower=U1lower,
-#     U2upper=U2upper,
-#     U2lower=U2lower,
-#     num_rand_dists_per_agent=5,
-#     rng=rng,
-# )
-#
-# is_success, x = tgs_var_utility(
-#     init_points=init_points, constraints=cons, bounds=bounds
-# )
-#
-# print(f"Success: {is_success}")
-#
-# # x0 = (
-# #     [0.0, 0.5, 0.5, np.mean(U1lower), 0.5, 0.5, np.mean(U2lower)]
-# #     + list(((U1lower + U1upper) / 2).ravel())
-# #     + list(((U2lower.T + U2upper.T) / 2).ravel())
-# # )
-# # fun = lambda x: 0  # feasibility problem
-# #
-# # res = minimize(
-# #     fun=fun,
-# #     x0=x0,
-# #     method="SLSQP",
-# #     bounds=bounds,
-# #     constraints=cons,
-# #     options={"disp": False},
-# # )
-# #
-# # print(res)
-# # x = res.x
-# u1start = M1 + M2 + 2
-# u2start = u1start + M1 * M2
-# print(f"Agent 1 strategy: {x[:M1]}, with value {x[M1]}")
-# print(f"Agent 2 strategy: {x[M1 + 1:M1 + M2 + 1]}, with value {x[M1 + M2 + 1]}")
-# print(f"U1: {np.reshape(x[u1start:u1start + M1 * M2], (M1, M2))}")
-# print(f"U2: {np.reshape(x[u2start:u2start + M2 * M1], (M2, M1)).T}")
-
-###################################################
-
-# M1 = 3
-# M2 = 2
-# N = 2  # num_players
-
-# new_U1 = np.reshape(x[u1start: u1start + M1 * M2], (M1, M2))
-# new_U2 = np.reshape(x[u2start: u2start + M2 * M1], (M2, M1)).T
-
-# U1 = np.array([[0., 6.],
-#                [2., 5.],
-#                [3., 3.]])
-# U2 = np.array([[1., 0.],
-#                [0., 2.],
-#                [4., 3.]])
-# s1 = np.array([0])
-# s2 = np.array([0, 1])
-# cons, bounds = build_tgs_constraints(M1=M1, M2=M2, s1=s1, s2=s2, U1=new_U1, U2=new_U2)
-# success, res = tgs(cons, bounds, M1, M2)
-# print(res)
+print("Calculating prob_eq")
+prob_eq_vals = prob_eq(
+    models=models,
+    domain=domain,
+    response_dicts=response_dicts,
+    num_actions=num_actions_discrete,
+)
+print(prob_eq_vals)
+print(
+    f"Strategy profile with max prob_eq: {domain[np.argmax(prob_eq_vals)]}, with a prob_eq value of {np.max(prob_eq_vals)}, idx {np.argmax(prob_eq_vals)}"
+)
+print(f"Chosen strategy profile has a brp of {brp[np.argmax(prob_eq_vals)]}")
+print(f"True NE has a prob_eq value of {prob_eq_vals[np.argmin(np.max(brp, axis=-1))]}")

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from core.pne import best_response_payoff_pure
+from core.pne import best_response_payoff_pure_discrete
 from core.utils import cross_product
 
 
@@ -102,8 +102,8 @@ def plot_utilities_2d_discrete(
     u2_reshaped = np.reshape(u2_vals, [num_actions, num_actions])
     print(f"u2: {u2_reshaped}")
 
-    brp = best_response_payoff_pure(
-        u=u, S=domain, actions=actions, response_dicts=response_dicts
+    brp = best_response_payoff_pure_discrete(
+        u=u, domain=domain, num_actions=num_actions, response_dicts=response_dicts
     )  # array of shape (M ** N, N)
     nne_idx = np.argmin(np.max(brp, axis=-1))
     nne = domain[nne_idx : nne_idx + 1]

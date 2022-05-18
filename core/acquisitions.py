@@ -1,7 +1,8 @@
 import numpy as np
+from statsmodels.sandbox.distributions.extras import mvnormcdf
 
-from core.pne import best_response_payoff_pure, ucb_f
-from core.mne import SEM, SEM_var_utility, get_strategies_and_support
+from core.pne import ucb_f
+from core.mne import SEM, get_strategies_and_support
 from core.utils import cross_product, maximize_fn, maxmin_fn
 
 
@@ -43,7 +44,7 @@ def create_ci_funcs(models, beta):
 
     def create_ci_func(model, is_ucb):
         def inn(X):
-            mean, var = model.predict_f(X)
+            mean, var = model.posterior().predict_f(X)
             if is_ucb:
                 return mean + beta * np.sqrt(var)
             else:  # is lcb
@@ -55,24 +56,6 @@ def create_ci_funcs(models, beta):
         [create_ci_func(models[i], is_ucb=True) for i in range(N)],
         [create_ci_func(models[i], is_ucb=False) for i in range(N)],
     )
-
-
-def ucb_pne_naive(beta, domain, actions, response_dicts):
-    def acq(models):
-        """
-        Returns a point to query next.
-        :param models: List of N GPflow GPs.
-        :return: array of shape (1, N).
-        """
-        ucb_funcs, _ = create_ci_funcs(models=models, beta=beta)
-        ucb_brp = best_response_payoff_pure(
-            u=ucb_funcs, S=domain, actions=actions, response_dicts=response_dicts
-        )  # array of shape (M ** N, N)
-
-        next_idx = np.argmin(np.max(ucb_brp, axis=-1))
-        return domain[next_idx : next_idx + 1]
-
-    return acq
 
 
 def ucb_pne_discrete(beta, domain, actions, response_dicts):
@@ -113,67 +96,6 @@ def ucb_pne_discrete(beta, domain, actions, response_dicts):
         return domain[np.array(samples_idxs)]
 
     return acq
-
-
-def maximize_ucb_f(
-    ucb_funcs, lcb_funcs, bounds, agent_dims_bounds, rng, n_samples_outer=5
-):
-    """
-    Computes argmax_s min_i ucb f(s) over a continuous domain.
-    :param ucb_funcs: List of N Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
-    :param lcb_funcs: List of N Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
-    :param bounds: array of shape (dims, 2).
-    :param agent_dims_bounds: List of N tuples (start_dim, end_dim).
-    :param rng: NumPy rng object.
-    :param n_samples_outer int.
-    :return: Array of shape (dims).
-    """
-    dims = len(bounds)
-    N = len(agent_dims_bounds)
-    samples = rng.uniform(
-        low=bounds[:, 0], high=bounds[:, 1], size=(n_samples_outer, dims)
-    )
-
-    # Obtain UCB values of utilities
-    ucb_vals = np.concatenate(
-        [ucb_funcs[i](samples) for i in range(N)], axis=-1
-    )  # (num_samples_outer, N)
-
-    # Obtain maximum LCB values of best response
-    max_lcb_vals = []
-    for s in samples:
-        print("maximize_ucb_f sample computing")
-        agent_max_lcb_vals = []
-        for i in range(N):
-            start_dim, end_dim = agent_dims_bounds[i]
-            s_before = s[:start_dim]
-            s_after = s[end_dim:]
-
-            lcb_func = lcb_funcs[i]
-            _, max_lcb_val = maximize_fn(
-                f=lambda x: lcb_func(
-                    np.concatenate(
-                        [
-                            np.tile(s_before, (len(x), 1)),
-                            x,
-                            np.tile(s_after, (len(x), 1)),
-                        ],
-                        axis=-1,
-                    )
-                ),
-                bounds=bounds[start_dim:end_dim],
-                rng=rng,
-                n_warmup=100,
-                n_iter=5,
-            )
-            agent_max_lcb_vals.append(max_lcb_val)
-        max_lcb_vals.append(agent_max_lcb_vals)
-    max_lcb_vals = np.array(max_lcb_vals)  # (num_samples_outer, N)
-    assert np.allclose(max_lcb_vals.shape, ucb_vals.shape)
-
-    ucb_f_vals = np.minimum(ucb_vals - max_lcb_vals, 0.0)
-    max_idx = np.argmax(np.min(ucb_f_vals, axis=-1))
-    return samples[max_idx]
 
 
 def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
@@ -295,63 +217,63 @@ def ucb_mne(beta, domain, M):
     return acq
 
 
-def ucb_mne_old(beta, domain, M):
-    def acq(models, prev_successes, rng):
-        """
-        Returns a pair of mixed strategies, and a batch of points to query next. Size of the batch will depend on the
-        size of the supports of the potential MNE found.
-        :param models: List of N GPflow GPs.
-        :param prev_successes:
-        :return: Tuple (tuple of 2 arrays of shape (M,), array of shape (B, N))
-        """
-        ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
-        U1upper = np.reshape(ucb_funcs[0](domain), (M, M))
-        U1lower = np.reshape(lcb_funcs[0](domain), (M, M))
-        U2upper = np.reshape(ucb_funcs[1](domain), (M, M))
-        U2lower = np.reshape(lcb_funcs[1](domain), (M, M))
+def prob_eq(domain, response_dicts, num_actions):
+    """
+    Calculates the probability of equilibrium from Picheny et. al. (2018). Requires a discretization of the continuous
+    domain, and calculated response dicts.
+    :param models:
+    :param domain: Array of shape (n, dims).
+    :param response_dicts: list of N dicts. Each is a dictionary with keys that are the bytes of a length dims array,
+    and returns the idxs of domain that have the actions of all other agents except i the same.
+    :param num_actions: int. WARNING: assumes all agents have the same num_actions.
+    :return: Array of shape (n,). The probability of equilibrium for each point in domain.
+    """
+    num_agents = len(response_dicts)
+    assert num_actions**num_agents == len(domain)
 
-        mne_list, prev_successes = SEM_var_utility(
-            U1upper=U1upper,
-            U1lower=U1lower,
-            U2upper=U2upper,
-            U2lower=U2lower,
-            num_rand_dists_per_agent=5,
-            rng=rng,
-            mode="first",
-            prev_successes=prev_successes,
-            evaluation_mode="linear_with_sampling",
-            num_samples=10,
-        )
-        mne = mne_list[0]
-        (s1, s2), (a1supp, a2supp) = get_strategies_and_support(mne, M, M)
+    def acq(models, rng):
+        probs = np.zeros((len(domain), num_agents))
+        is_calculated = np.zeros((len(domain), num_agents), dtype=np.bool)
+        # Precompute selection matrices
+        mats = []
+        for k in range(num_actions):
+            mat = np.eye(num_actions)
+            mat[:, k] = -1
+            mat = np.delete(mat, k, axis=0)  # (num_actions - 1, num_actions)
+            mats.append(mat)
+        mats = np.array(mats)
 
-        samples_coords = cross_product(a1supp[:, None], a2supp[:, None])
-        print(f"samples: {samples_coords}")
-        exploring_samples_coords = []
-        for a1 in a1supp:
-            a1_ucb = U2upper[a1]  # Given a1, can agent 2 do better?
-            a1_ucb_argmax_a2coord = np.argmax(a1_ucb)
-            if (
-                a1_ucb_argmax_a2coord not in a2supp
-            ):  # if it is, we would already have sampled this
-                exploring_samples_coords.append([a1, a1_ucb_argmax_a2coord])
-        for a2 in a2supp:
-            a2_ucb = U1upper[:, a2]  # Given a2, can agent 1 do better?
-            a2_ucb_argmax_a1coord = np.argmax(a2_ucb)
-            if (
-                a2_ucb_argmax_a1coord not in a1supp
-            ):  # if it is, we would already have sampled this
-                exploring_samples_coords.append([a2_ucb_argmax_a1coord, a2])
+        for j, s in enumerate(domain):
+            for i in range(num_agents):
+                if not is_calculated[j, i]:
+                    response_idxs = response_dicts[i][s.tobytes()]
+                    response_points = domain[response_idxs]
+                    mean, cov = (
+                        models[i].posterior().predict_f(response_points, full_cov=True)
+                    )
+                    cov = np.squeeze(cov.numpy(), axis=0)
+                    assert num_actions == len(mean)
+                    for k, M in enumerate(mats):
+                        idx = response_idxs[k]
+                        if not is_calculated[idx, i]:
+                            mean_reduced = np.squeeze(M @ mean, axis=-1)
+                            cov_reduced = M @ cov @ M.T
+                            prob = mvnormcdf(
+                                upper=np.zeros(num_actions - 1),
+                                mu=mean_reduced,
+                                cov=cov_reduced,
+                                maxpts=5000,
+                                abseps=1,
+                            )
+                            probs[idx, i] = prob
+                            is_calculated[idx, i] = True
 
-        print(f"exploring samples: {exploring_samples_coords}")
-        if len(exploring_samples_coords) != 0:
-            all_coords = np.concatenate(
-                [samples_coords, np.array(exploring_samples_coords)], axis=0
-            )  # (B, 2)
-        else:
-            all_coords = samples_coords
-        all_domain_idxs = all_coords[:, 0] * M + all_coords[:, 1]
-
-        return domain[all_domain_idxs], (s1, s2), prev_successes
+        assert is_calculated.all()
+        prob_eq_vals = np.prod(probs, axis=-1)
+        return domain[np.argmax(prob_eq_vals)][None, :]
 
     return acq
+
+
+def SUR(models, domain, response_dicts):
+    pass
