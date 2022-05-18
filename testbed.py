@@ -27,7 +27,7 @@ agent_dims = [2, 2]  # this determines num_agents and dims
 ls = np.array([0.5] * sum(agent_dims))
 bound = [-1.0, 1.0]  # assumes same bounds for all dims
 noise_variance = 0.001
-num_init_points = 400
+num_init_points = 10
 num_iters = 800
 beta = 2.0
 maxmin_mode = "DIRECT"
@@ -84,14 +84,14 @@ print("Finding PNE")
 brp = best_response_payoff_pure_discrete(
     u=u, domain=domain, num_actions=num_actions_discrete, response_dicts=response_dicts
 )
-pne = find_PNE_discrete(
+pne, idx = find_PNE_discrete(
     u=u, domain=domain, num_actions=num_actions_discrete, response_dicts=response_dicts
 )
-print(
-    f"PNE at {pne} with idx {np.argmin(np.max(brp, axis=-1))} and brp {brp[np.argmin(np.max(brp, axis=-1))]}"
-)
+print(f"PNE at {pne} with idx {idx} and brp {brp[np.argmin(np.max(brp, axis=-1))]}")
 
-models = create_models(data=init_data, kernel=kernel, noise_variance=noise_variance)
+models = create_models(
+    num_agents=num_agents, data=init_data, kernel=kernel, noise_variance=noise_variance
+)
 from core.acquisitions import prob_eq
 
 print("Calculating prob_eq")

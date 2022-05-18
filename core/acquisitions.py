@@ -1,7 +1,7 @@
 import numpy as np
 from statsmodels.sandbox.distributions.extras import mvnormcdf
 
-from core.pne import ucb_f
+from core.pne import ucb_f, find_PNE_discrete
 from core.mne import SEM, get_strategies_and_support
 from core.utils import cross_product, maximize_fn, maxmin_fn
 
@@ -219,9 +219,8 @@ def ucb_mne(beta, domain, M):
 
 def prob_eq(domain, response_dicts, num_actions):
     """
-    Calculates the probability of equilibrium from Picheny et. al. (2018). Requires a discretization of the continuous
+    Probability of Equilibrium acquisition from Picheny et. al. (2018). Requires a discretization of the continuous
     domain, and calculated response dicts.
-    :param models:
     :param domain: Array of shape (n, dims).
     :param response_dicts: list of N dicts. Each is a dictionary with keys that are the bytes of a length dims array,
     and returns the idxs of domain that have the actions of all other agents except i the same.
@@ -273,6 +272,111 @@ def prob_eq(domain, response_dicts, num_actions):
         return domain[np.argmax(prob_eq_vals)][None, :]
 
     return acq
+
+
+def estimate_entropy(fvals, domain, num_actions, response_dicts):
+    """
+    Gamma-hat from Picheny et. al. (2018), page 8.
+    :param fvals: array of shape (num_draws, n, num_agents). Realizations of random functions.
+    :param domain:
+    :param num_actions:
+    :param response_dicts:
+    :return: scalar.
+    """
+    ne_vals = []
+    for fval in fvals:
+        _, idx = find_PNE_discrete(
+            u=fval,
+            domain=domain,
+            num_actions=num_actions,
+            response_dicts=response_dicts,
+            is_u_func=False,
+        )
+        ne_vals.append(fval[idx])
+    ne_vals = np.array(ne_vals).T  # (num_agents, num_draws)
+    cov = np.cov(m=ne_vals)
+    return np.linalg.det(cov)
+
+
+def eq_entropy(
+    models, domain, num_draws, num_point_samples, num_actions, response_dicts, rng
+):
+    """
+    Calculates the NE entropy by conditioning on each point in domain. From Picheny et. al. (2018), equation (17).
+    Smaller is better, so take the argmin after calculating these values.
+    :param models: List of N GPflow GPs.
+    :param domain: Array of shape (n, dims).
+    :param num_draws: int. Number of GP draws.
+    :param num_point_samples: int. Number of samples per point in the domain to condition the GP draws on.
+    :param num_actions: int.
+    :param response_dicts:
+    :param rng: NumPy rng object.
+    :return: array of shape (n, ). Entropy of each point in the domain.
+    """
+    n = len(domain)
+    num_agents = len(models)
+    # Draw num_draws number of realizations of random functions from GP
+    gp_draws = []
+    means = []
+    covs = []
+    for model in models:
+        mean, cov = model.posterior().predict_f(domain, full_cov=True)
+        mean, cov = np.squeeze(mean, axis=-1), np.squeeze(cov, axis=0)
+        gp_draw = rng.multivariate_normal(
+            mean=mean, cov=cov, size=num_draws
+        )  # slow for large domain
+        gp_draws.append(gp_draw)  # (num_draws, n)
+        means.append(mean)
+        covs.append(cov)
+
+    # For each point in domain, draw num_point_samples number of samples. Use faster method of sampling
+    # since draws are independent
+    sample_draws = []
+    varis = []
+    for i, model in enumerate(models):
+        _, var = model.posterior().predict_f(domain)  # (n, 1)
+        varis.append(np.squeeze(var, axis=-1))
+        sample = rng.normal(size=(n, num_point_samples))
+        sqrt_cov = np.sqrt(np.diag(varis[i]))  # (n, n)
+        sample_draws_i = sqrt_cov @ sample + means[i][:, None]  # (n, num_point_samples)
+        sample_draws.append(sample_draws_i)
+
+    # For each point in domain and for each point sample, condition the random functions on that sample
+    all_Y_cond_F = []
+    for i in range(num_agents):
+        lambdas = (
+            covs[i] / varis[i][:, None]
+        )  # (n, n) matrix where each row is a lambda
+
+        gp_draw = gp_draws[i]  # (num_draws, n)
+        sample_draw = sample_draws[i]  # (n, num_point_samples)
+
+        A = sample_draw.T[:, None, :] - gp_draw  # (num_point_samples, num_draws, n)
+        B = A[..., None] * lambdas  # (num_point_samples, num_draws, n, n)
+        Y_cond_F = B + gp_draw[None, :, :, None]  # (num_point_samples, num_draws, n, n)
+        all_Y_cond_F.append(Y_cond_F)
+    all_Y_cond_F = np.array(
+        all_Y_cond_F
+    )  # (num_agents, num_point_samples, num_draws, n, n)
+    all_Y_cond_F = np.transpose(
+        all_Y_cond_F, [3, 1, 2, 4, 0]
+    )  # (n, num_point_samples, num_draws, n, num_agents)
+
+    # For each point in domain, estimate entropy
+    scores = []
+    for j in range(n):
+        entropies = []
+        for k in range(num_point_samples):
+            entropy = estimate_entropy(
+                fvals=all_Y_cond_F[j, k],
+                domain=domain,
+                num_actions=num_actions,
+                response_dicts=response_dicts,
+            )
+            entropies.append(entropy)
+        scores.append(np.mean(entropies))
+
+    return scores
 
 
 def SUR(models, domain, response_dicts):

@@ -135,6 +135,7 @@ def main(
     )
 
     final_data, chosen_strategies = bo_loop_mne(
+        num_agents=num_agents,
         init_data=init_data,
         observer=observer,
         acquisition=acq_func,

@@ -123,6 +123,7 @@ def main(
     )
 
     final_data = bo_loop_pne(
+        num_agents=num_agents,
         init_data=init_data,
         observer=observer,
         acquisition=acq_func,
