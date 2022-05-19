@@ -48,10 +48,10 @@ def calc_regret_pne(
     return np.array(imm_regret), np.array(cumu_regret)
 
 
-def calc_regret_pne_discrete(u, data, domain, actions, response_dicts):
+def calc_regret_pne_discrete(u, data, domain, response_dicts):
     X, _ = data
     brp = best_response_payoff_pure_discrete(
-        u=u, domain=domain, num_actions=len(actions), response_dicts=response_dicts
+        u=u, domain=domain, response_dicts=response_dicts
     )  # (M ** N, N)
     strategy_eps = np.max(brp, axis=-1)
     best = np.min(strategy_eps)

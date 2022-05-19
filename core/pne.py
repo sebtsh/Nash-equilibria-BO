@@ -2,26 +2,22 @@ import numpy as np
 from core.utils import maximize_fn
 
 
-def best_response_payoff_pure_discrete(
-    u, domain, num_actions, response_dicts, is_u_func=True
-):
+def best_response_payoff_pure_discrete(u, domain, response_dicts, is_u_func=True):
     """
     Calculates the best response payoff for each pure strategy profile in S, for each agent. As currently implemented,
     O(M^2N^2) operation. WARNING: Assumes all agents have the same number of actions.
     :param u: List of utility functions OR domain utility values as an array of shape (M ** N, N). Indicate which it is
     with is_u_func.
     :param domain: array of shape (M ** N, N). All possible pure strategy profiles of the N agents.
-    :param num_actions: int.
     :param response_dicts: list of N dictionaries.
     :param is_u_func: True if u is a list of utility functions and False if u is utility array of shape (M ** N, N).
     :return: array of shape (M ** N, N).
     """
-    M = num_actions
     N = len(response_dicts)
-    brp = np.zeros((M**N, N))
+    brp = np.zeros((len(domain), N))
 
     if is_u_func:
-        all_utils = np.zeros((M**N, N))
+        all_utils = np.zeros((len(domain), N))
         for j in range(N):
             all_utils[:, j] = np.squeeze(u[j](domain), axis=-1)
     else:
@@ -38,7 +34,7 @@ def best_response_payoff_pure_discrete(
     return brp
 
 
-def find_PNE_discrete(u, domain, num_actions, response_dicts, is_u_func=True):
+def find_PNE_discrete(u, domain, response_dicts, is_u_func=True):
     """
     Calculates the PNE for a discrete domain.
     :param u: List of utility functions OR domain utility values as an array of shape (M ** N, N). Indicate which it is
@@ -52,7 +48,6 @@ def find_PNE_discrete(u, domain, num_actions, response_dicts, is_u_func=True):
     brp = best_response_payoff_pure_discrete(
         u=u,
         domain=domain,
-        num_actions=num_actions,
         response_dicts=response_dicts,
         is_u_func=is_u_func,
     )  # (M ** N, N)

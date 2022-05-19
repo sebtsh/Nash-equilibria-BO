@@ -27,7 +27,7 @@ agent_dims = [2, 2]  # this determines num_agents and dims
 ls = np.array([0.5] * sum(agent_dims))
 bound = [-1.0, 1.0]  # assumes same bounds for all dims
 noise_variance = 0.001
-num_init_points = 10
+num_init_points = 400
 num_iters = 800
 beta = 2.0
 maxmin_mode = "DIRECT"
@@ -35,7 +35,7 @@ n_samples_outer = 10
 seed = 0
 known_best_val = None
 num_actions_discrete = (
-    64  # for acquisition functions that require discretization, i.e. prob_eq and SUR
+    32  # for acquisition functions that require discretization, i.e. prob_eq and SUR
 )
 
 num_agents = len(agent_dims)
@@ -82,20 +82,19 @@ init_data = (init_X, observer(init_X))
 
 print("Finding PNE")
 brp = best_response_payoff_pure_discrete(
-    u=u, domain=domain, num_actions=num_actions_discrete, response_dicts=response_dicts
+    u=u, domain=domain, response_dicts=response_dicts
 )
-pne, idx = find_PNE_discrete(
-    u=u, domain=domain, num_actions=num_actions_discrete, response_dicts=response_dicts
-)
+pne, idx = find_PNE_discrete(u=u, domain=domain, response_dicts=response_dicts)
 print(f"PNE at {pne} with idx {idx} and brp {brp[np.argmin(np.max(brp, axis=-1))]}")
 
 models = create_models(
     num_agents=num_agents, data=init_data, kernel=kernel, noise_variance=noise_variance
 )
-from core.acquisitions import prob_eq
+from core.acquisitions import compute_prob_eq_vals
 
 print("Calculating prob_eq")
-prob_eq_vals = prob_eq(
+prob_eq_vals = compute_prob_eq_vals(
+    X_idxs=np.arange(len(domain)),
     models=models,
     domain=domain,
     response_dicts=response_dicts,

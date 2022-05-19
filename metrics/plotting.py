@@ -103,7 +103,7 @@ def plot_utilities_2d_discrete(
     print(f"u2: {u2_reshaped}")
 
     brp = best_response_payoff_pure_discrete(
-        u=u, domain=domain, num_actions=num_actions, response_dicts=response_dicts
+        u=u, domain=domain, response_dicts=response_dicts
     )  # array of shape (M ** N, N)
     nne_idx = np.argmin(np.max(brp, axis=-1))
     nne = domain[nne_idx : nne_idx + 1]

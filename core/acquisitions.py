@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import norm
 from statsmodels.sandbox.distributions.extras import mvnormcdf
 
 from core.pne import ucb_f, find_PNE_discrete
@@ -217,6 +218,60 @@ def ucb_mne(beta, domain, M):
     return acq
 
 
+def compute_prob_eq_vals(X_idxs, models, domain, num_actions, response_dicts):
+    """
+
+    :param X_idxs: domain indices we wish to compute these values on. Array of shape (b, ).
+    :param models:
+    :param domain:
+    :param num_actions:
+    :param response_dicts:
+    :return:
+    """
+    num_agents = len(models)
+    probs = np.zeros((len(domain), num_agents))
+    is_calculated = np.zeros((len(domain), num_agents), dtype=np.bool)
+    # Precompute selection matrices
+    mats = []
+    for k in range(num_actions):
+        mat = np.eye(num_actions)
+        mat[:, k] = -1
+        mat = np.delete(mat, k, axis=0)  # (num_actions - 1, num_actions)
+        mats.append(mat)
+    mats = np.array(mats)
+
+    for s_idx in X_idxs:
+        s = domain[s_idx]
+        for i in range(num_agents):
+            if not is_calculated[s_idx, i]:
+                response_idxs = response_dicts[i][s.tobytes()]
+                response_points = domain[response_idxs]
+                mean, cov = (
+                    models[i].posterior().predict_f(response_points, full_cov=True)
+                )
+                cov = np.squeeze(cov.numpy(), axis=0)
+                assert num_actions == len(mean)
+                for k, M in enumerate(mats):
+                    idx = response_idxs[k]
+                    if not is_calculated[idx, i] and idx in X_idxs:
+                        mean_reduced = np.squeeze(M @ mean, axis=-1)
+                        cov_reduced = M @ cov @ M.T
+                        prob = mvnormcdf(
+                            upper=np.zeros(num_actions - 1),
+                            mu=mean_reduced,
+                            cov=cov_reduced,
+                            maxpts=5000,
+                            abseps=1,
+                        )
+                        probs[idx, i] = prob
+                        is_calculated[idx, i] = True
+
+    assert is_calculated[X_idxs].all()
+    prob_eq_vals = np.prod(probs[X_idxs], axis=-1)  # (b, )
+
+    return prob_eq_vals
+
+
 def prob_eq(domain, response_dicts, num_actions):
     """
     Probability of Equilibrium acquisition from Picheny et. al. (2018). Requires a discretization of the continuous
@@ -231,88 +286,79 @@ def prob_eq(domain, response_dicts, num_actions):
     assert num_actions**num_agents == len(domain)
 
     def acq(models, rng):
-        probs = np.zeros((len(domain), num_agents))
-        is_calculated = np.zeros((len(domain), num_agents), dtype=np.bool)
-        # Precompute selection matrices
-        mats = []
-        for k in range(num_actions):
-            mat = np.eye(num_actions)
-            mat[:, k] = -1
-            mat = np.delete(mat, k, axis=0)  # (num_actions - 1, num_actions)
-            mats.append(mat)
-        mats = np.array(mats)
-
-        for j, s in enumerate(domain):
-            for i in range(num_agents):
-                if not is_calculated[j, i]:
-                    response_idxs = response_dicts[i][s.tobytes()]
-                    response_points = domain[response_idxs]
-                    mean, cov = (
-                        models[i].posterior().predict_f(response_points, full_cov=True)
-                    )
-                    cov = np.squeeze(cov.numpy(), axis=0)
-                    assert num_actions == len(mean)
-                    for k, M in enumerate(mats):
-                        idx = response_idxs[k]
-                        if not is_calculated[idx, i]:
-                            mean_reduced = np.squeeze(M @ mean, axis=-1)
-                            cov_reduced = M @ cov @ M.T
-                            prob = mvnormcdf(
-                                upper=np.zeros(num_actions - 1),
-                                mu=mean_reduced,
-                                cov=cov_reduced,
-                                maxpts=5000,
-                                abseps=1,
-                            )
-                            probs[idx, i] = prob
-                            is_calculated[idx, i] = True
-
-        assert is_calculated.all()
-        prob_eq_vals = np.prod(probs, axis=-1)
+        prob_eq_vals = compute_prob_eq_vals(
+            X_idxs=np.arange(len(domain)),
+            models=models,
+            domain=domain,
+            num_actions=num_actions,
+            response_dicts=response_dicts,
+        )
         return domain[np.argmax(prob_eq_vals)][None, :]
 
     return acq
 
 
-def estimate_entropy(fvals, domain, num_actions, response_dicts):
+def compute_NE_matrix(fvals, domain, response_dicts):
     """
-    Gamma-hat from Picheny et. al. (2018), page 8.
-    :param fvals: array of shape (num_draws, n, num_agents). Realizations of random functions.
+
+    :param fvals: array of shape (num_draws, n, num_agents).
     :param domain:
-    :param num_actions:
     :param response_dicts:
-    :return: scalar.
+    :return:
     """
     ne_vals = []
     for fval in fvals:
         _, idx = find_PNE_discrete(
             u=fval,
             domain=domain,
-            num_actions=num_actions,
             response_dicts=response_dicts,
             is_u_func=False,
         )
         ne_vals.append(fval[idx])
     ne_vals = np.array(ne_vals).T  # (num_agents, num_draws)
+    return ne_vals
+
+
+def estimate_entropy(fvals, domain, response_dicts):
+    """
+    Gamma-hat from Picheny et. al. (2018), page 8.
+    :param fvals: array of shape (num_draws, n, num_agents). Realizations of random functions.
+    :param domain:
+    :param response_dicts:
+    :return: scalar.
+    """
+    ne_vals = compute_NE_matrix(
+        fvals=fvals, domain=domain, response_dicts=response_dicts
+    )  # (num_agents, num_draws)
     cov = np.cov(m=ne_vals)
     return np.linalg.det(cov)
 
 
 def eq_entropy(
-    models, domain, num_draws, num_point_samples, num_actions, response_dicts, rng
+    X_idxs,
+    models,
+    domain,
+    response_dicts,
+    noise_variance,
+    rng,
+    num_draws=20,
+    num_point_samples=20,
 ):
     """
-    Calculates the NE entropy by conditioning on each point in domain. From Picheny et. al. (2018), equation (17).
+    Calculates the NE entropy by conditioning on each point in X. From Picheny et. al. (2018), equation (17).
     Smaller is better, so take the argmin after calculating these values.
+    :param X_idxs: domain indices we wish to compute these values on. Array of shape (b, ).
     :param models: List of N GPflow GPs.
     :param domain: Array of shape (n, dims).
+    :param response_dicts:
+    :param noise_variance:
+    :param rng: NumPy rng object.
     :param num_draws: int. Number of GP draws.
     :param num_point_samples: int. Number of samples per point in the domain to condition the GP draws on.
-    :param num_actions: int.
-    :param response_dicts:
-    :param rng: NumPy rng object.
-    :return: array of shape (n, ). Entropy of each point in the domain.
+    :return: array of shape (b, ). Entropy of each point in the domain.
     """
+    X = domain[X_idxs]
+    b = len(X_idxs)
     n = len(domain)
     num_agents = len(models)
     # Draw num_draws number of realizations of random functions from GP
@@ -329,55 +375,189 @@ def eq_entropy(
         means.append(mean)
         covs.append(cov)
 
-    # For each point in domain, draw num_point_samples number of samples. Use faster method of sampling
+    # For each point in X, draw num_point_samples number of samples. Use faster method of sampling
     # since draws are independent
     sample_draws = []
-    varis = []
+    X_varis = []
     for i, model in enumerate(models):
-        _, var = model.posterior().predict_f(domain)  # (n, 1)
-        varis.append(np.squeeze(var, axis=-1))
-        sample = rng.normal(size=(n, num_point_samples))
-        sqrt_cov = np.sqrt(np.diag(varis[i]))  # (n, n)
-        sample_draws_i = sqrt_cov @ sample + means[i][:, None]  # (n, num_point_samples)
+        _, var = model.posterior().predict_f(X)  # (b, 1)
+        X_varis.append(np.squeeze(var, axis=-1))
+        sample = rng.normal(size=(b, num_point_samples))
+        sqrt_cov = np.sqrt(np.diag(X_varis[i] + noise_variance))  # (b, b)
+        sample_draws_i = (
+            sqrt_cov @ sample + means[i][X_idxs, None]
+        )  # (b, num_point_samples)
         sample_draws.append(sample_draws_i)
 
-    # For each point in domain and for each point sample, condition the random functions on that sample
+    # For each point in X and for each point sample, condition the random functions on that sample
     all_Y_cond_F = []
     for i in range(num_agents):
         lambdas = (
-            covs[i] / varis[i][:, None]
-        )  # (n, n) matrix where each row is a lambda
+            covs[i][X_idxs] / X_varis[i][X_idxs, None]
+        )  # (b, n) matrix where each row is a lambda
 
         gp_draw = gp_draws[i]  # (num_draws, n)
-        sample_draw = sample_draws[i]  # (n, num_point_samples)
+        sample_draw = sample_draws[i]  # (b, num_point_samples)
 
-        A = sample_draw.T[:, None, :] - gp_draw  # (num_point_samples, num_draws, n)
-        B = A[..., None] * lambdas  # (num_point_samples, num_draws, n, n)
-        Y_cond_F = B + gp_draw[None, :, :, None]  # (num_point_samples, num_draws, n, n)
+        A = (
+            sample_draw.T[:, None, :] - gp_draw[:, X_idxs]
+        )  # (num_point_samples, num_draws, b)
+        B = A[..., None] * lambdas  # (num_point_samples, num_draws, b, n)
+        Y_cond_F = (
+            B + gp_draw[None, :, X_idxs, None]
+        )  # (num_point_samples, num_draws, b, n)
         all_Y_cond_F.append(Y_cond_F)
     all_Y_cond_F = np.array(
         all_Y_cond_F
-    )  # (num_agents, num_point_samples, num_draws, n, n)
+    )  # (num_agents, num_point_samples, num_draws, b, n)
     all_Y_cond_F = np.transpose(
         all_Y_cond_F, [3, 1, 2, 4, 0]
-    )  # (n, num_point_samples, num_draws, n, num_agents)
+    )  # (b, num_point_samples, num_draws, n, num_agents)
 
     # For each point in domain, estimate entropy
     scores = []
-    for j in range(n):
+    for j in range(b):
         entropies = []
         for k in range(num_point_samples):
             entropy = estimate_entropy(
                 fvals=all_Y_cond_F[j, k],
                 domain=domain,
-                num_actions=num_actions,
                 response_dicts=response_dicts,
             )
             entropies.append(entropy)
         scores.append(np.mean(entropies))
 
-    return scores
+    # Prepare gp_draws for next iteration
+    gp_draws = np.array(gp_draws)  # (num_agents, num_draws, n)
+    gp_draws = np.transpose(gp_draws, [1, 2, 0])
+
+    return scores, gp_draws
 
 
-def SUR(models, domain, response_dicts):
-    pass
+def C_target(X_idxs, models, domain, response_dicts):
+    """
+    Computes the target criterion for X.
+    :param X_idxs: domain indices we wish to compute these values on. Array of shape (b, ).
+    :param models:
+    :param domain:
+    :param response_dicts:
+    :return: Scores. Array of size (b, ).
+    """
+    X = domain[X_idxs]
+    post_means = []
+    for i, model in enumerate(models):
+        mean, _ = model.posterior().predict_f(domain)  # (n, 1)
+        post_means.append(np.squeeze(mean, axis=-1))
+    post_means = np.array(post_means).T  # (n, num_agents)
+    fvals = post_means[None, ...]  # (1, n, num_agents)
+
+    ne_vals = compute_NE_matrix(
+        fvals=fvals, domain=domain, response_dicts=response_dicts
+    )  # (num_agents, 1)
+
+    means = []
+    varis = []
+    for i, model in enumerate(models):
+        mean, var = model.posterior().predict_f(X)  # (b, 1)
+        means.append(np.squeeze(mean, axis=-1))
+        varis.append(np.squeeze(var, axis=-1))
+    means = np.array(means)  # (num_agents, b)
+    varis = np.array(varis)  # (num_agents, b)
+
+    likelihood_per_agent = norm.pdf(
+        (ne_vals - means) / np.sqrt(varis)
+    )  # (num_agents, b)
+    likelihood = np.prod(likelihood_per_agent, axis=0)  # (b, )
+    return likelihood
+
+
+def C_box(X_idxs, fvals, models, domain, response_dicts):
+    """
+    Computes the box criterion for X.
+    :param X_idxs: domain indices we wish to compute these values on. Array of shape (b, ).
+    :param fvals: array of shape (num_draws, n, num_agents). Realizations of random functions.
+    :param models:
+    :param domain:
+    :param response_dicts:
+    :return: Scores. Array of size (b, ).
+    """
+    X = domain[X_idxs]
+    ne_vals = compute_NE_matrix(
+        fvals=fvals, domain=domain, response_dicts=response_dicts
+    )  # (num_agents, num_draws)
+    T_Li = np.min(ne_vals, axis=-1)  # (num_agents)
+    T_Ui = np.max(ne_vals, axis=-1)  # (num_agents)
+
+    means = []
+    varis = []
+    for i, model in enumerate(models):
+        mean, var = model.posterior().predict_f(X)  # (b, 1)
+        means.append(np.squeeze(mean, axis=-1))
+        varis.append(np.squeeze(var, axis=-1))
+    means = np.array(means)  # (num_agents, b)
+    varis = np.array(varis)  # (num_agents, b)
+
+    prob_less_upper = norm((T_Ui[:, None] - means) / np.sqrt(varis))  # (num_agents, b)
+    prob_less_lower = norm((T_Li[:, None] - means) / np.sqrt(varis))  # (num_agents, b)
+    prob_box = np.prod(prob_less_upper - prob_less_lower, axis=0)  # (b, )
+
+    return prob_box
+
+
+def SUR(
+    domain, response_dicts, num_actions, noise_variance, num_sim=1296, num_cand=256
+):
+    if num_sim > len(domain):
+        num_sim = len(domain)
+    if num_cand > num_sim:
+        num_cand = num_sim
+
+    def acq(models, rng, prev_gp_draws=None):
+        if prev_gp_draws is None:
+            sim_scores = C_target(
+                X_idxs=np.arange(len(domain)),
+                models=models,
+                domain=domain,
+                response_dicts=response_dicts,
+            )
+        else:
+            sim_scores = C_box(
+                X_idxs=np.arange(len(domain)),
+                fvals=prev_gp_draws,
+                models=models,
+                domain=domain,
+                response_dicts=response_dicts,
+            )
+        assert len(sim_scores) == len(domain)
+
+        X_sim_idxs = np.argpartition(sim_scores, -num_sim)[-num_sim:]
+
+        cand_scores = compute_prob_eq_vals(
+            X_idxs=X_sim_idxs,
+            models=models,
+            domain=domain,
+            num_actions=num_actions,
+            response_dicts=response_dicts,
+        )
+        assert len(cand_scores) == len(X_sim_idxs)
+
+        # these idxs are with respect to cand_scores
+        X_cand_idxs_inter = np.argpartition(cand_scores, -num_cand)[-num_cand:]
+        X_cand_idxs = X_sim_idxs[
+            X_cand_idxs_inter
+        ]  # these are now with respect to domain
+
+        entropy_scores, gp_draws = eq_entropy(
+            X_idxs=X_cand_idxs,
+            models=models,
+            domain=domain,
+            response_dicts=response_dicts,
+            noise_variance=noise_variance,
+            rng=rng,
+        )
+        assert len(entropy_scores) == len(X_cand_idxs)
+        # this idx is with respect to entropy_scores
+
+        return domain[X_cand_idxs[np.argmin(entropy_scores)]][None, :], gp_draws
+
+    return acq
