@@ -2,9 +2,10 @@ import numpy as np
 from scipy.stats import norm
 from statsmodels.sandbox.distributions.extras import mvnormcdf
 
-from core.pne import ucb_f, find_PNE_discrete
+from core.pne import find_PNE_discrete
 from core.mne import SEM, get_strategies_and_support
 from core.utils import cross_product, maximize_fn, maxmin_fn
+from core.models import create_ci_funcs
 
 
 def get_acq_pure(
@@ -14,6 +15,10 @@ def get_acq_pure(
     agent_dims_bounds,
     mode,
     n_samples_outer,
+    noise_variance,
+    domain=None,
+    response_dicts=None,
+    num_actions=None,
 ):
     if acq_name == "ucb_pne":
         return ucb_pne(
@@ -22,6 +27,28 @@ def get_acq_pure(
             agent_dims_bounds=agent_dims_bounds,
             mode=mode,
             n_samples_outer=n_samples_outer,
+        )
+    elif acq_name == "prob_eq":
+        if domain is None or response_dicts is None or num_actions is None:
+            raise Exception("None params passed to prob_eq")
+        return prob_eq(
+            domain=domain, response_dicts=response_dicts, num_actions=num_actions
+        )
+    elif acq_name == "SUR":
+        if domain is None or response_dicts is None or num_actions is None:
+            raise Exception("None params passed to SUR")
+        return SUR(
+            domain=domain,
+            response_dicts=response_dicts,
+            num_actions=num_actions,
+            noise_variance=noise_variance,
+        )
+    elif acq_name == "BN":
+        return BN(
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=mode,
+            gamma=beta,
         )
     else:
         raise Exception("Invalid acquisition name")
@@ -34,73 +61,8 @@ def get_acq_mixed(acq_name, beta, domain, num_actions):
         raise Exception("Invalid acquisition name")
 
 
-def create_ci_funcs(models, beta):
-    """
-    Converts GP models into UCB functions and LCB functions.
-    :param models: List of N GPflow GPs.
-    :param beta: float.
-    :return: Tuple, 2 lists of Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
-    """
-    N = len(models)
-
-    def create_ci_func(model, is_ucb):
-        def inn(X):
-            mean, var = model.posterior().predict_f(X)
-            if is_ucb:
-                return mean + beta * np.sqrt(var)
-            else:  # is lcb
-                return mean - beta * np.sqrt(var)
-
-        return inn
-
-    return (
-        [create_ci_func(models[i], is_ucb=True) for i in range(N)],
-        [create_ci_func(models[i], is_ucb=False) for i in range(N)],
-    )
-
-
-def ucb_pne_discrete(beta, domain, actions, response_dicts):
-    def acq(models):
-        """
-        Returns N + 1 points to query next. First one is no-regret selection, next N are exploring samples.
-        :param models: List of N GPflow GPs.
-        :return: array of shape (N + 1, N).
-        """
-        M = len(actions)
-        _, N = domain.shape
-        ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
-        all_ucb = np.zeros((M**N, N))
-        all_lcb = np.zeros((M**N, N))
-        for j in range(N):
-            all_ucb[:, j] = np.squeeze(ucb_funcs[j](domain), axis=-1)
-            all_lcb[:, j] = np.squeeze(lcb_funcs[j](domain), axis=-1)
-
-        samples_idxs = []
-        # Pick no-regret selection
-        ucb_f_vals = ucb_f(
-            all_ucb=all_ucb,
-            all_lcb=all_lcb,
-            S=domain,
-            actions=actions,
-            response_dicts=response_dicts,
-        )
-        noreg_idx = np.argmax(np.min(ucb_f_vals, axis=-1))
-        samples_idxs.append(noreg_idx)
-        s_t = domain[noreg_idx]  # (N, )
-
-        # Pick exploring samples
-        for i in range(N):
-            idxs = response_dicts[i][s_t.tobytes()]
-            ucb_vals = all_ucb[idxs, i]
-            samples_idxs.append(idxs[np.argmax(ucb_vals)])
-
-        return domain[np.array(samples_idxs)]
-
-    return acq
-
-
 def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
-    def acq(models, rng):
+    def acq(models, rng, args_dict):
         """
         Returns N + 1 points to query next. First one is no-regret selection, next N are exploring samples.
         :param models: List of N GPflow GPs.
@@ -153,9 +115,9 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
             )
             samples.append(np.concatenate([s_before, max_ucb_sample, s_after]))
 
-        return np.array(samples)
+        return np.array(samples), args_dict
 
-    return acq
+    return acq, {}
 
 
 def ucb_mne(beta, domain, M):
@@ -218,6 +180,120 @@ def ucb_mne(beta, domain, M):
     return acq
 
 
+def BN(
+    bounds,
+    agent_dims_bounds,
+    mode,
+    gamma,
+    explore_prob=0.05,
+    n_samples_estimate=1000,
+):
+    """
+    Acquisition function from Al-Dujaili et. al. (2018).
+    :param bounds:
+    :param agent_dims_bounds:
+    :param mode:
+    :param gamma:
+    :param explore_prob:
+    :param n_samples_estimate:
+    :return:
+    """
+
+    def acq(models, rng, args_dict):
+        N = len(agent_dims_bounds)
+
+        if mode == "DIRECT":
+            max_mode = "DIRECT"
+        else:
+            max_mode = "L-BFGS-B"
+
+        is_exploring = bool(rng.binomial(n=1, p=explore_prob))
+        if not is_exploring:
+            # Use BN acquisition function
+            def obj(s):
+                b = len(s)
+                estimated_regs = []
+                for i in range(N):
+                    start_dim, end_dim = agent_dims_bounds[i]
+                    s_before = s[:, :start_dim]  # (b, dims - d_i)
+                    s_before = s_before[:, None, :]  # ( b, 1, dims - d_i)
+                    s_after = s[:, end_dim:]  # (b, dims - d_i)
+                    s_after = s_after[:, None, :]  # ( b, 1, dims - d_i)
+
+                    # Sample n_samples_estimate of points in agent i's action space
+                    X_i = rng.uniform(
+                        low=bounds[start_dim:end_dim, 0],
+                        high=bounds[start_dim:end_dim, 1],
+                        size=(n_samples_estimate, end_dim - start_dim),
+                    )
+                    X_i = X_i[
+                        None, :, :
+                    ]  # (1, n_samples_estimate, end_dim - start_dim)
+                    X = np.concatenate(
+                        [
+                            np.tile(s_before, (1, n_samples_estimate, 1)),
+                            np.tile(X_i, (b, 1, 1)),
+                            np.tile(s_after, (1, n_samples_estimate, 1)),
+                        ],
+                        axis=-1,
+                    )
+
+                    X_preds, _ = (
+                        models[i].posterior().predict_f(X)
+                    )  # (b, n_samples_estimate, 1)
+                    assert X_preds.shape == (b, n_samples_estimate, 1)
+
+                    estimated_mean = np.mean(X_preds, axis=1)  # (b, 1)
+                    estimated_var = np.mean(
+                        (X_preds - estimated_mean[:, None, :]) ** 2, axis=1
+                    )  # (b, 1)
+                    estimated_std = np.sqrt(estimated_var)  # (b, 1)
+                    s_mean, _ = models[i].posterior().predict_f(s)  # (b, 1)
+
+                    estimated_regs.append(
+                        np.squeeze(
+                            (estimated_mean + gamma * estimated_std - s_mean)
+                            / estimated_std,
+                            axis=-1,
+                        )
+                    )
+                estimated_regs = np.array(estimated_regs)  # (N, b)
+                assert estimated_regs.shape == (N, b)
+                return -np.max(estimated_regs, axis=0)[:, None]  # (b, 1)
+
+            ret_sample, _ = maximize_fn(
+                f=obj,
+                bounds=bounds,
+                rng=rng,
+                mode=max_mode,
+                n_warmup=10,
+            )
+        else:
+            # Pick point with highest uncertainty
+            def obj(s):
+                b = len(s)
+                stds = []
+                for i in range(N):
+                    _, s_var = models[i].posterior().predict_f(s)  # (b, 1)
+                    s_std = np.sqrt(s_var)  # (b, 1)
+                    stds.append(np.squeeze(s_std, axis=-1))
+                stds = np.array(stds)  # (N, b)
+                assert stds.shape == (N, b)
+                return np.max(stds, axis=0)[:, None]  # (b, 1)
+
+            ret_sample, _ = maximize_fn(
+                f=obj,
+                bounds=bounds,
+                rng=rng,
+                mode=max_mode,
+                n_warmup=100,
+            )
+
+        return ret_sample[None, :], args_dict
+
+    return acq, {}
+
+
 def compute_prob_eq_vals(X_idxs, models, domain, num_actions, response_dicts):
     """
 
@@ -228,6 +304,7 @@ def compute_prob_eq_vals(X_idxs, models, domain, num_actions, response_dicts):
     :param response_dicts:
     :return:
     """
+    print("Computing prob_eq_vals")
     num_agents = len(models)
     probs = np.zeros((len(domain), num_agents))
     is_calculated = np.zeros((len(domain), num_agents), dtype=np.bool)
@@ -285,7 +362,7 @@ def prob_eq(domain, response_dicts, num_actions):
     num_agents = len(response_dicts)
     assert num_actions**num_agents == len(domain)
 
-    def acq(models, rng):
+    def acq(models, rng, args_dict):
         prob_eq_vals = compute_prob_eq_vals(
             X_idxs=np.arange(len(domain)),
             models=models,
@@ -293,9 +370,9 @@ def prob_eq(domain, response_dicts, num_actions):
             num_actions=num_actions,
             response_dicts=response_dicts,
         )
-        return domain[np.argmax(prob_eq_vals)][None, :]
+        return domain[np.argmax(prob_eq_vals)][None, :], args_dict
 
-    return acq
+    return acq, {}
 
 
 def compute_NE_matrix(fvals, domain, response_dicts):
@@ -357,11 +434,13 @@ def eq_entropy(
     :param num_point_samples: int. Number of samples per point in the domain to condition the GP draws on.
     :return: array of shape (b, ). Entropy of each point in the domain.
     """
+    print("Computing entropies")
     X = domain[X_idxs]
     b = len(X_idxs)
     n = len(domain)
     num_agents = len(models)
     # Draw num_draws number of realizations of random functions from GP
+    print("eq_ent: drawing num_draws random functions from GP")
     gp_draws = []
     means = []
     covs = []
@@ -377,6 +456,7 @@ def eq_entropy(
 
     # For each point in X, draw num_point_samples number of samples. Use faster method of sampling
     # since draws are independent
+    print("eq_ent: drawing num_point_samples number of samples")
     sample_draws = []
     X_varis = []
     for i, model in enumerate(models):
@@ -390,6 +470,7 @@ def eq_entropy(
         sample_draws.append(sample_draws_i)
 
     # For each point in X and for each point sample, condition the random functions on that sample
+    print("eq_ent: conditioning random functions on samples using FOXY")
     all_Y_cond_F = []
     for i in range(num_agents):
         lambdas = (
@@ -415,6 +496,7 @@ def eq_entropy(
     )  # (b, num_point_samples, num_draws, n, num_agents)
 
     # For each point in domain, estimate entropy
+    print("eq_ent: for each point in X, estimate entropy")
     scores = []
     for j in range(b):
         entropies = []
@@ -443,6 +525,7 @@ def C_target(X_idxs, models, domain, response_dicts):
     :param response_dicts:
     :return: Scores. Array of size (b, ).
     """
+    print("Computing C_target")
     X = domain[X_idxs]
     post_means = []
     for i, model in enumerate(models):
@@ -481,6 +564,7 @@ def C_box(X_idxs, fvals, models, domain, response_dicts):
     :param response_dicts:
     :return: Scores. Array of size (b, ).
     """
+    print("Computing C_box")
     X = domain[X_idxs]
     ne_vals = compute_NE_matrix(
         fvals=fvals, domain=domain, response_dicts=response_dicts
@@ -497,8 +581,12 @@ def C_box(X_idxs, fvals, models, domain, response_dicts):
     means = np.array(means)  # (num_agents, b)
     varis = np.array(varis)  # (num_agents, b)
 
-    prob_less_upper = norm((T_Ui[:, None] - means) / np.sqrt(varis))  # (num_agents, b)
-    prob_less_lower = norm((T_Li[:, None] - means) / np.sqrt(varis))  # (num_agents, b)
+    prob_less_upper = norm.cdf(
+        (T_Ui[:, None] - means) / np.sqrt(varis)
+    )  # (num_agents, b)
+    prob_less_lower = norm.cdf(
+        (T_Li[:, None] - means) / np.sqrt(varis)
+    )  # (num_agents, b)
     prob_box = np.prod(prob_less_upper - prob_less_lower, axis=0)  # (b, )
 
     return prob_box
@@ -512,7 +600,10 @@ def SUR(
     if num_cand > num_sim:
         num_cand = num_sim
 
-    def acq(models, rng, prev_gp_draws=None):
+    args_dict = {"prev_gp_draws": None}
+
+    def acq(models, rng, args_dict):
+        prev_gp_draws = args_dict["prev_gp_draws"]
         if prev_gp_draws is None:
             sim_scores = C_target(
                 X_idxs=np.arange(len(domain)),
@@ -557,7 +648,8 @@ def SUR(
         )
         assert len(entropy_scores) == len(X_cand_idxs)
         # this idx is with respect to entropy_scores
+        args_dict["prev_gp_draws"] = gp_draws
 
-        return domain[X_cand_idxs[np.argmin(entropy_scores)]][None, :], gp_draws
+        return domain[X_cand_idxs[np.argmin(entropy_scores)]][None, :], args_dict
 
-    return acq
+    return acq, args_dict

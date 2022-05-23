@@ -1,3 +1,4 @@
+import numpy as np
 import gpflow as gpf
 
 
@@ -27,3 +28,28 @@ def create_models(num_agents, data, kernel, noise_variance):
         )
         for i in range(num_agents)
     ]
+
+
+def create_ci_funcs(models, beta):
+    """
+    Converts GP models into UCB functions and LCB functions.
+    :param models: List of N GPflow GPs.
+    :param beta: float.
+    :return: Tuple, 2 lists of Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
+    """
+    N = len(models)
+
+    def create_ci_func(model, is_ucb):
+        def inn(X):
+            mean, var = model.posterior().predict_f(X)
+            if is_ucb:
+                return mean + beta * np.sqrt(var)
+            else:  # is lcb
+                return mean - beta * np.sqrt(var)
+
+        return inn
+
+    return (
+        [create_ci_func(models[i], is_ucb=True) for i in range(N)],
+        [create_ci_func(models[i], is_ucb=False) for i in range(N)],
+    )

@@ -116,7 +116,7 @@ def all_subset_actions(actions):
     return list(powerset(actions))[1:]
 
 
-def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10):
+def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=100):
     """
     Approximately maximizes a function f using either DIRECT or sampling + L-BFGS-B method adapted from
     https://github.com/fmfn/BayesianOptimization.
@@ -126,7 +126,8 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10):
     :param mode: str. Either 'DIRECT' or 'L-BFGS-B'.
     :param n_warmup: int. Number of random samples.
     :param n_iter: int. Number of L-BFGS-B starting points.
-    :return: Array of shape (d,).
+    :param n_iter_direct:
+    :return: (Array of shape (d,), max_val).
     """
     d = len(bounds)
     neg_func_squeezed = lambda x: np.squeeze(-f(x[None, :]))
@@ -156,7 +157,7 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10):
 
     elif mode == "DIRECT":
         res = direct_minimize(
-            func=neg_func_squeezed, bounds=bounds, algmethod=1, maxT=100
+            func=neg_func_squeezed, bounds=bounds, algmethod=1, maxT=n_iter_direct
         )
         if not res.success:
             raise Exception("DIRECT failed in maximize_fn")

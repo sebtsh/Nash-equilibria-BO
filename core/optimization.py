@@ -5,7 +5,15 @@ from core.models import create_models
 
 
 def bo_loop_pne(
-    num_agents, init_data, observer, acquisition, num_iters, kernel, noise_variance, rng
+    num_agents,
+    init_data,
+    observer,
+    acquisition,
+    num_iters,
+    kernel,
+    noise_variance,
+    rng,
+    args_dict,
 ):
     """
     Main Bayesian optimization loop for PNEs.
@@ -17,10 +25,12 @@ def bo_loop_pne(
     :param kernel:
     :param noise_variance:
     :param rng:
+    :param args_dict:
     :return:
     """
     data = init_data
     sample_buffer = np.zeros((0, 0))
+
     for _ in trange(num_iters):
         if len(sample_buffer) == 0:
             models = create_models(
@@ -29,7 +39,9 @@ def bo_loop_pne(
                 kernel=kernel,
                 noise_variance=noise_variance,
             )
-            sample_buffer = acquisition(models=models, rng=rng)  # (n, N)
+            sample_buffer, args_dict = acquisition(
+                models=models, rng=rng, args_dict=args_dict
+            )  # (n, N)
         x_new = sample_buffer[0][None, :]
         sample_buffer = np.delete(sample_buffer, 0, axis=0)
         y_new = observer(x_new)

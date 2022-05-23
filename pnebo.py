@@ -6,7 +6,12 @@ import pickle
 from core.objectives import get_utilities, noisy_observer
 from core.optimization import bo_loop_pne
 from core.acquisitions import get_acq_pure
-from core.utils import get_agent_dims_bounds
+from core.utils import (
+    get_agent_dims_bounds,
+    discretize_domain,
+    cross_product,
+    create_response_dict,
+)
 from metrics.regret import calc_regret_pne
 from metrics.plotting import plot_utilities_2d, plot_regret
 from sacred import Experiment
@@ -21,18 +26,19 @@ ex.observers.append(FileStorageObserver("./runs"))
 @ex.named_config
 def rand():
     utility_name = "rand"
-    acq_name = "ucb_pne"
+    acq_name = "BN"
     agent_dims = [1, 1]  # this determines num_agents and dims
     ls = np.array([0.5] * sum(agent_dims))
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 800
+    num_iters = 5
     beta = 2.0
-    maxmin_mode = "DIRECT"
+    maxmin_mode = "random"
     n_samples_outer = 10
     seed = 0
     known_best_val = None
+    num_actions_discrete = 16
 
 
 @ex.named_config
@@ -50,6 +56,7 @@ def gan():
     n_samples_outer = 12
     seed = 0
     known_best_val = 0.0
+    num_actions_discrete = 32
 
 
 @ex.named_config
@@ -67,6 +74,7 @@ def bcad():
     n_samples_outer = 15
     seed = 0
     known_best_val = 0.0
+    num_actions_discrete = 32
 
 
 @ex.automain
@@ -84,6 +92,7 @@ def main(
     n_samples_outer,
     seed,
     known_best_val,
+    num_actions_discrete,
 ):
     args = dict(sorted(locals().items()))
     print(f"Running with parameters {args}")
@@ -113,13 +122,41 @@ def main(
     )
     init_data = (init_X, observer(init_X))
 
-    acq_func = get_acq_pure(
+    if (
+        acq_name == "prob_eq" or acq_name == "SUR"
+    ):  # Do these steps for discrete acquisitions
+        # Discretize the domain
+        domain = discretize_domain(
+            num_agents=num_agents,
+            num_actions=num_actions_discrete,
+            bounds=bounds,
+            agent_dims=agent_dims,
+        )
+        # Create response_dicts
+        print("Creating response dicts")
+        action_idxs = np.arange(num_actions_discrete)
+        domain_in_idxs = action_idxs[:, None]
+        for i in range(1, num_agents):
+            domain_in_idxs = cross_product(domain_in_idxs, action_idxs[:, None])
+        response_dicts = [
+            create_response_dict(i, domain, domain_in_idxs, action_idxs)
+            for i in range(len(agent_dims))
+        ]
+    else:
+        domain = None
+        response_dicts = None
+
+    acq_func, args_dict = get_acq_pure(
         acq_name=acq_name,
         beta=beta,
         bounds=bounds,
         agent_dims_bounds=agent_dims_bounds,
         mode=maxmin_mode,
         n_samples_outer=n_samples_outer,
+        noise_variance=noise_variance,
+        domain=domain,
+        response_dicts=response_dicts,
+        num_actions=num_actions_discrete,
     )
 
     final_data = bo_loop_pne(
@@ -131,6 +168,7 @@ def main(
         kernel=kernel,
         noise_variance=noise_variance,
         rng=rng,
+        args_dict=args_dict,
     )
 
     final_data_minus_init = (
