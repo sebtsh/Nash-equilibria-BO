@@ -359,3 +359,22 @@ def discretize_domain(num_agents, num_actions, bounds, agent_dims):
             sobol_sequence(num_points=num_actions, bounds=bounds[start_dim:end_dim]),
         )
     return domain
+
+
+def get_maxmin_mode():
+    """
+    Tries to call DIRECT. If an exception is thrown, means DIRECT cannot be used.
+    :return: either "DIRECT" or "random".
+    """
+
+    def obj(x):
+        return (x**2).sum()
+
+    bounds = [[-3.0, 3.0], [0.5, 5.0]]
+    try:
+        res = direct_minimize(obj, bounds=bounds, algmethod=1)
+    except Exception:
+        print("DIRECT not working, maxmin_mode set to random")
+        return "random"
+
+    return "DIRECT"

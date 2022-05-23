@@ -11,9 +11,10 @@ from core.utils import (
     discretize_domain,
     cross_product,
     create_response_dict,
+    get_maxmin_mode,
 )
-from metrics.regret import calc_regret_pne
-from metrics.plotting import plot_utilities_2d, plot_regret
+from metrics.regret import calc_regret_pne, calc_imm_regret_pne
+from metrics.plotting import plot_utilities_2d, plot_regret, plot_imm_regret
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from pathlib import Path
@@ -26,7 +27,7 @@ ex.observers.append(FileStorageObserver("./runs"))
 @ex.named_config
 def rand():
     utility_name = "rand"
-    acq_name = "BN"
+    acq_name = "ucb_pne"
     agent_dims = [1, 1]  # this determines num_agents and dims
     ls = np.array([0.5] * sum(agent_dims))
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
@@ -34,11 +35,11 @@ def rand():
     num_init_points = 5
     num_iters = 5
     beta = 2.0
-    maxmin_mode = "random"
     n_samples_outer = 10
     seed = 0
     known_best_val = None
     num_actions_discrete = 16
+    immreg_skip_length = 2
 
 
 @ex.named_config
@@ -52,11 +53,11 @@ def gan():
     num_init_points = 5
     num_iters = 1200
     beta = 2.0
-    maxmin_mode = "DIRECT"
     n_samples_outer = 12
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
+    immreg_skip_length = 2
 
 
 @ex.named_config
@@ -70,11 +71,11 @@ def bcad():
     num_init_points = 5
     num_iters = 1600
     beta = 2.0
-    maxmin_mode = "DIRECT"
     n_samples_outer = 15
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
+    immreg_skip_length = 2
 
 
 @ex.automain
@@ -88,16 +89,17 @@ def main(
     num_init_points,
     num_iters,
     beta,
-    maxmin_mode,
     n_samples_outer,
     seed,
     known_best_val,
     num_actions_discrete,
+    immreg_skip_length,
 ):
     args = dict(sorted(locals().items()))
     print(f"Running with parameters {args}")
     run_id = ex.current_run._id
 
+    maxmin_mode = get_maxmin_mode()
     num_agents = len(agent_dims)
     dims = np.sum(agent_dims)
     bounds = np.array([bound for _ in range(dims)])
@@ -177,7 +179,7 @@ def main(
     )
 
     print("Computing regret")
-    imm_regret, cumu_regret = calc_regret_pne(
+    sample_regret, cumu_regret = calc_regret_pne(
         u=u,
         data=final_data_minus_init,
         bounds=bounds,
@@ -190,12 +192,12 @@ def main(
 
     regrets_save_dir = dir + "regrets/"
     plot_regret(
-        regret=imm_regret,
+        regret=sample_regret,
         num_iters=num_iters,
-        title="Immediate regret (all samples)",
+        title="Sample regret (all samples)",
         save=True,
         save_dir=regrets_save_dir,
-        filename=filename + "-imm",
+        filename=filename + "-sample",
     )
     plot_regret(
         regret=cumu_regret,
@@ -205,40 +207,40 @@ def main(
         save_dir=regrets_save_dir,
         filename=filename + "-cumu",
     )
-
-    noreg_seq = np.array(
-        [
-            j * (num_agents + 1)
-            for j in range(int(np.ceil(num_iters / (num_agents + 1))))
-        ],
-        dtype=np.int32,
-    )
-    plot_regret(
-        regret=imm_regret[noreg_seq],
-        num_iters=len(noreg_seq),
-        title="Immediate regret (no-regret sequence)",
-        save=True,
-        save_dir=regrets_save_dir,
-        filename=filename + "-immnoreg",
-    )
-    noreg_cumu_regret = []
-    for i in range(len(noreg_seq)):
-        noreg_cumu_regret.append(np.sum(imm_regret[noreg_seq][: i + 1]))
-    plot_regret(
-        regret=noreg_cumu_regret,
-        num_iters=len(noreg_seq),
-        title="Cumulative regret (no-regret sequence)",
-        save=True,
-        save_dir=regrets_save_dir,
-        filename=filename + "-cumunoreg",
-    )
-
     print("Regrets of all samples")
-    print(imm_regret)
+    print(sample_regret)
     print(cumu_regret)
-    print("Regrets of no-regret sequence")
-    print(imm_regret[noreg_seq])
-    print(cumu_regret[noreg_seq])
+
+    if acq_name == "ucb_pne":
+        noreg_seq = np.array(
+            [
+                j * (num_agents + 1)
+                for j in range(int(np.ceil(num_iters / (num_agents + 1))))
+            ],
+            dtype=np.int32,
+        )
+        plot_regret(
+            regret=sample_regret[noreg_seq],
+            num_iters=len(noreg_seq),
+            title="Sample regret (no-regret sequence)",
+            save=True,
+            save_dir=regrets_save_dir,
+            filename=filename + "-samplenoreg",
+        )
+        noreg_cumu_regret = []
+        for i in range(len(noreg_seq)):
+            noreg_cumu_regret.append(np.sum(sample_regret[noreg_seq][: i + 1]))
+        plot_regret(
+            regret=noreg_cumu_regret,
+            num_iters=len(noreg_seq),
+            title="Cumulative regret (no-regret sequence)",
+            save=True,
+            save_dir=regrets_save_dir,
+            filename=filename + "-cumunoreg",
+        )
+        print("Regrets of no-regret sequence")
+        print(sample_regret[noreg_seq])
+        print(cumu_regret[noreg_seq])
 
     if dims == 2:
         utils_save_dir = dir + "utils/"
@@ -256,8 +258,34 @@ def main(
     pickles_save_dir = dir + "pickles/"
     Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
-        (final_data, imm_regret, cumu_regret),
+        (final_data, sample_regret, cumu_regret),
         open(pickles_save_dir + f"{filename}.p", "wb"),
+    )
+
+    print("Calculating immediate regret")
+    imm_regret = calc_imm_regret_pne(
+        u=u,
+        data=final_data,
+        num_agents=num_agents,
+        num_init_points=num_init_points,
+        kernel=kernel,
+        noise_variance=noise_variance,
+        bounds=bounds,
+        agent_dims_bounds=agent_dims_bounds,
+        mode=maxmin_mode,
+        rng=rng,
+        n_samples_outer=n_samples_outer,
+        known_best_val=known_best_val,
+        skip_length=immreg_skip_length,
+    )
+    plot_imm_regret(
+        regret=imm_regret,
+        num_iters=num_iters,
+        skip_length=immreg_skip_length,
+        title="Immediate regret",
+        save=True,
+        save_dir=regrets_save_dir,
+        filename=filename + "-immreg",
     )
 
     print(f"Completed run {run_id} with parameters {args}")

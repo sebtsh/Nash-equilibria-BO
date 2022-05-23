@@ -53,3 +53,22 @@ def create_ci_funcs(models, beta):
         [create_ci_func(models[i], is_ucb=True) for i in range(N)],
         [create_ci_func(models[i], is_ucb=False) for i in range(N)],
     )
+
+
+def create_mean_funcs(models):
+    """
+    Converts GP models into their posterior mean functions.
+    :param models: List of N GPflow GPs.
+    :param beta: float.
+    :return: List of Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
+    """
+    N = len(models)
+
+    def create_mean_func(model):
+        def inn(X):
+            mean, _ = model.posterior().predict_f(X)
+            return mean
+
+        return inn
+
+    return [create_mean_func(models[i]) for i in range(N)]

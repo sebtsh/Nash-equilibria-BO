@@ -66,6 +66,8 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
         """
         Returns N + 1 points to query next. First one is no-regret selection, next N are exploring samples.
         :param models: List of N GPflow GPs.
+        :param rng:
+        :param args_dict:
         :return: array of shape (N + 1, N).
         """
         N = len(agent_dims_bounds)
