@@ -33,13 +33,13 @@ def rand():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 5
+    num_iters = 800
     beta = 2.0
     n_samples_outer = 10
     seed = 0
     known_best_val = None
     num_actions_discrete = 16
-    immreg_skip_length = 2
+    immreg_skip_length = 20
 
 
 @ex.named_config
@@ -57,7 +57,7 @@ def gan():
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
-    immreg_skip_length = 2
+    immreg_skip_length = 20
 
 
 @ex.named_config
@@ -75,7 +75,7 @@ def bcad():
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
-    immreg_skip_length = 2
+    immreg_skip_length = 20
 
 
 @ex.automain
@@ -286,6 +286,11 @@ def main(
         save=True,
         save_dir=regrets_save_dir,
         filename=filename + "-immreg",
+    )
+
+    pickle.dump(
+        (final_data, sample_regret, cumu_regret, imm_regret),
+        open(pickles_save_dir + f"{filename}-2.p", "wb"),
     )
 
     print(f"Completed run {run_id} with parameters {args}")

@@ -374,7 +374,7 @@ def get_maxmin_mode():
     try:
         res = direct_minimize(obj, bounds=bounds, algmethod=1)
     except Exception:
-        print("DIRECT not working, maxmin_mode set to random")
+        print("WARNING: DIRECT not working, maxmin_mode set to random")
         return "random"
 
     return "DIRECT"

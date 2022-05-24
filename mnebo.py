@@ -26,7 +26,7 @@ def rand():
     agent_dims = [1, 1]  # this determines num_agents and dims
     ls = np.array([0.5] * sum(agent_dims))
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
-    num_actions = 8
+    num_actions = 16
     noise_variance = 0.001
     num_init_points = 5
     num_iters = 5
