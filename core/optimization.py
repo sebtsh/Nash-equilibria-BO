@@ -2,6 +2,7 @@ import numpy as np
 from tqdm import trange
 from core.utils import merge_data
 from core.models import create_models
+from time import process_time
 
 
 def bo_loop_pne(
@@ -30,7 +31,7 @@ def bo_loop_pne(
     """
     data = init_data
     sample_buffer = np.zeros((0, 0))
-
+    start = process_time()
     for _ in trange(num_iters):
         if len(sample_buffer) == 0:
             models = create_models(
@@ -46,8 +47,9 @@ def bo_loop_pne(
         sample_buffer = np.delete(sample_buffer, 0, axis=0)
         y_new = observer(x_new)
         data = merge_data(data, (x_new, y_new))
-
-    return data
+    end = process_time()
+    total_time = end - start
+    return data, total_time
 
 
 def bo_loop_mne(
@@ -83,6 +85,7 @@ def bo_loop_mne(
     sample_buffer = np.zeros((0, 0))
     strategy_buffer = None
     prev_successes = []
+    start = process_time()
     for _ in trange(num_iters):
         # print(f"prev_successes: {prev_successes}")
         if len(sample_buffer) == 0:
@@ -100,21 +103,22 @@ def bo_loop_mne(
         y_new = observer(x_new)
         data = merge_data(data, (x_new, y_new))
         chosen_strategies.append(strategy_buffer)
+    end = process_time()
+    total_time = end - start
+    # if plot:
+    #     plot_models_2d(
+    #         models=models,
+    #         xlims=(0, 1),
+    #         ylims=(0, 1),
+    #         actions=actions,
+    #         domain=domain,
+    #         X=data[0][t : t + 1],
+    #         title=f"GPs iter {t}",
+    #         cmap="Spectral",
+    #         save=True,
+    #         save_dir=save_dir,
+    #         filename=f"gps_{t}",
+    #         show_plot=False,
+    #     )
 
-        # if plot:
-        #     plot_models_2d(
-        #         models=models,
-        #         xlims=(0, 1),
-        #         ylims=(0, 1),
-        #         actions=actions,
-        #         domain=domain,
-        #         X=data[0][t : t + 1],
-        #         title=f"GPs iter {t}",
-        #         cmap="Spectral",
-        #         save=True,
-        #         save_dir=save_dir,
-        #         filename=f"gps_{t}",
-        #         show_plot=False,
-        #     )
-
-    return data, chosen_strategies
+    return data, chosen_strategies, total_time

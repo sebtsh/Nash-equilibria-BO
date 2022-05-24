@@ -53,7 +53,7 @@ def gan():
     num_init_points = 5
     num_iters = 1200
     beta = 2.0
-    n_samples_outer = 12
+    n_samples_outer = 11
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
@@ -71,7 +71,7 @@ def bcad():
     num_init_points = 5
     num_iters = 1600
     beta = 2.0
-    n_samples_outer = 15
+    n_samples_outer = 12
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
@@ -161,7 +161,7 @@ def main(
         num_actions=num_actions_discrete,
     )
 
-    final_data = bo_loop_pne(
+    final_data, total_time = bo_loop_pne(
         num_agents=num_agents,
         init_data=init_data,
         observer=observer,
@@ -177,6 +177,7 @@ def main(
         final_data[0][num_init_points:],
         final_data[1][num_init_points:],
     )
+    time_per_iter = total_time / num_iters
 
     print("Computing regret")
     sample_regret, cumu_regret = calc_regret_pne(
@@ -258,7 +259,7 @@ def main(
     pickles_save_dir = dir + "pickles/"
     Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
-        (final_data, sample_regret, cumu_regret),
+        (final_data, sample_regret, cumu_regret, time_per_iter, args),
         open(pickles_save_dir + f"{filename}.p", "wb"),
     )
 
@@ -289,7 +290,7 @@ def main(
     )
 
     pickle.dump(
-        (final_data, sample_regret, cumu_regret, imm_regret),
+        (final_data, sample_regret, cumu_regret, time_per_iter, args, imm_regret),
         open(pickles_save_dir + f"{filename}-2.p", "wb"),
     )
 

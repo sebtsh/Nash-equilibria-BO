@@ -22,14 +22,14 @@ ex.observers.append(FileStorageObserver("./runs"))
 @ex.named_config
 def rand():
     utility_name = "rand"
-    acq_name = "max_ent_mne"
+    acq_name = "ucb_mne"
     agent_dims = [1, 1]  # this determines num_agents and dims
     ls = np.array([0.5] * sum(agent_dims))
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     num_actions = 16
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 5
+    num_iters = 800
     beta = 2.0
     seed = 0
 
@@ -134,7 +134,7 @@ def main(
         acq_name=acq_name, beta=beta, domain=domain, num_actions=num_actions
     )
 
-    final_data, chosen_strategies = bo_loop_mne(
+    final_data, chosen_strategies, total_time = bo_loop_mne(
         num_agents=num_agents,
         init_data=init_data,
         observer=observer,
@@ -145,22 +145,23 @@ def main(
         rng=rng,
         plot=False,
     )
+    time_per_iter = total_time / num_iters
 
-    imm_regret, cumu_regret = calc_regret_mne(
+    sample_regret, cumu_regret = calc_regret_mne(
         strategies=chosen_strategies, U1=U1, U2=U2
     )
     print("Immediate regret:")
-    print(imm_regret)
+    print(sample_regret)
     print("Cumulative regret:")
     print(cumu_regret)
     regrets_save_dir = dir + "regrets/"
     plot_regret(
-        regret=imm_regret,
+        regret=sample_regret,
         num_iters=num_iters,
-        title=f"MNE-{utility_name}: Immediate regret",
+        title=f"MNE-{utility_name}: Sample regret",
         save=True,
         save_dir=regrets_save_dir,
-        filename=filename + "-imm",
+        filename=filename + "-sample",
     )
     plot_regret(
         regret=cumu_regret,
@@ -173,7 +174,14 @@ def main(
     pickles_save_dir = dir + "pickles/"
     Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
-        (final_data, chosen_strategies, imm_regret, cumu_regret),
+        (
+            final_data,
+            chosen_strategies,
+            sample_regret,
+            cumu_regret,
+            time_per_iter,
+            args,
+        ),
         open(pickles_save_dir + f"{filename}.p", "wb"),
     )
 
