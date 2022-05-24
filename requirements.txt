@@ -4,6 +4,7 @@ tensorflow == 2.8.0
 tensorflow-probability == 0.16.0
 gpflow == 2.4.0
 scipydirect == 1.3
+statsmodels == 0.13.2
 sacred
 matplotlib
 tqdm
