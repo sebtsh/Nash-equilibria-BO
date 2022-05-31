@@ -420,8 +420,9 @@ def eq_entropy(
     all_Y_cond_F = []
     for i in range(num_agents):
         lambdas = (
-            covs[i][X_idxs] / X_varis[i][X_idxs, None]
+            covs[i][X_idxs] / X_varis[i][:, None]
         )  # (b, n) matrix where each row is a lambda
+        assert lambdas.shape == (b, n)
 
         gp_draw = gp_draws[i]  # (num_draws, n)
         sample_draw = sample_draws[i]  # (b, num_point_samples)
@@ -440,6 +441,7 @@ def eq_entropy(
     all_Y_cond_F = np.transpose(
         all_Y_cond_F, [3, 1, 2, 4, 0]
     )  # (b, num_point_samples, num_draws, n, num_agents)
+    assert all_Y_cond_F.shape == (b, num_point_samples, num_draws, n, num_agents)
 
     # For each point in domain, estimate entropy
     print("eq_ent: for each point in X, estimate entropy")
@@ -457,6 +459,7 @@ def eq_entropy(
 
     # Prepare gp_draws for next iteration
     gp_draws = np.array(gp_draws)  # (num_agents, num_draws, n)
+    assert gp_draws.shape == (num_agents, num_draws, n)
     gp_draws = np.transpose(gp_draws, [1, 2, 0])
 
     return scores, gp_draws
