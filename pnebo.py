@@ -12,6 +12,7 @@ from core.utils import (
     cross_product,
     create_response_dict,
     get_maxmin_mode,
+    maxmin_fn,
 )
 from metrics.regret import calc_regret_pne, calc_imm_regret_pne
 from metrics.plotting import plot_utilities_2d, plot_regret, plot_imm_regret
@@ -244,6 +245,15 @@ def main(
         print(cumu_regret[noreg_seq])
 
     if dims == 2:
+        known_best_point, _ = _, best_val = maxmin_fn(
+            outer_funcs=u,
+            inner_funcs=u,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=maxmin_mode,
+            rng=rng,
+            n_samples_outer=100,
+        )
         utils_save_dir = dir + "utils/"
         plot_utilities_2d(
             u=u,
@@ -254,6 +264,7 @@ def main(
             save_dir=utils_save_dir,
             filename="utilities",
             show_plot=False,
+            known_best_point=known_best_point[None, :],
         )
 
     pickles_save_dir = dir + "pickles/"

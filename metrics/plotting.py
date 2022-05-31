@@ -9,13 +9,14 @@ from core.utils import cross_product
 def plot_utilities_2d(
     u,
     bounds,
-    num_discrete=200,
+    num_discrete=500,
     title="",
     cmap="Spectral",
     save=False,
     save_dir="",
     filename="",
     show_plot=True,
+    known_best_point=None,
 ):
     ymin, ymax = bounds[0]
     xmin, xmax = bounds[1]
@@ -52,6 +53,14 @@ def plot_utilities_2d(
     ax1.set_xlabel(xlabel, size=12)
     ax1.set_ylabel(ylabel, size=12)
     fig.colorbar(im1, ax=ax1)
+    if known_best_point is not None:
+        ax1.plot(
+            known_best_point[:, 1],
+            known_best_point[:, 0],
+            "*",
+            markersize=10,
+            c="white",
+        )
 
     im2 = ax2.imshow(
         u2_reshaped,
@@ -65,6 +74,14 @@ def plot_utilities_2d(
     ax2.set_xlabel(xlabel, size=12)
     ax2.set_ylabel(ylabel, size=12)
     fig.colorbar(im2, ax=ax2)
+    if known_best_point is not None:
+        ax2.plot(
+            known_best_point[:, 1],
+            known_best_point[:, 0],
+            "*",
+            markersize=10,
+            c="white",
+        )
 
     fig.tight_layout()
     if save:
