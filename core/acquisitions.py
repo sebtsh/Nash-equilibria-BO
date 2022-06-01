@@ -68,11 +68,11 @@ def get_acq_mixed(acq_name, beta, domain, num_actions):
 def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
     def acq(models, rng, args_dict):
         """
-        Returns N + 1 points to query next. First one is no-regret selection, next N are exploring samples.
+        Returns 2 points to query next. First one is no-regret selection, second is exploring sample.
         :param models: List of N GPflow GPs.
         :param rng:
         :param args_dict:
-        :return: array of shape (N + 1, N).
+        :return: array of shape (2, N).
         """
         N = len(agent_dims_bounds)
         ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
@@ -94,13 +94,17 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
             exploring_max_mode = "DIRECT"
         else:
             exploring_max_mode = "L-BFGS-B"
+
+        pot_exploring_samples = []
+        pot_exploring_vals = []
+        noreg_lcb_vals = []
         for i in range(N):
             start_dim, end_dim = agent_dims_bounds[i]
             s_before = noreg_sample[:start_dim]
             s_after = noreg_sample[end_dim:]
 
             ucb_func = ucb_funcs[i]
-            max_ucb_sample, _ = maximize_fn(
+            max_ucb_sample, max_ucb_val = maximize_fn(
                 f=lambda x: np.squeeze(
                     ucb_func(
                         np.concatenate(
@@ -119,7 +123,15 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
                 n_warmup=100,
                 n_iter=5,
             )
-            samples.append(np.concatenate([s_before, max_ucb_sample, s_after]))
+            pot_exploring_samples.append(np.concatenate([s_before, max_ucb_sample, s_after]))
+            pot_exploring_vals.append(max_ucb_val)
+
+            noreg_lcb_vals.append(np.squeeze(lcb_funcs[i](noreg_sample[None, :])))
+
+        exploring_scores = np.array(noreg_lcb_vals) - np.array(pot_exploring_vals)
+        assert exploring_scores.shape == (N,)
+        exploring_sample = pot_exploring_samples[np.argmin(exploring_scores)]
+        samples.append(exploring_sample)
 
         return np.array(samples), args_dict
 
