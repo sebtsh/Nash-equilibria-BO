@@ -135,6 +135,7 @@ def main(
             bounds=bounds,
             agent_dims=agent_dims,
         )
+        domain.flags.writeable = False
         # Create response_dicts
         print("Creating response dicts")
         action_idxs = np.arange(num_actions_discrete)

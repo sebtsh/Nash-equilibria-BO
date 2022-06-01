@@ -258,8 +258,8 @@ def bcad_utilities(rect_bounds, rng, m=20):
         :param params: array of shape (n, 6).
         :return: array of shape (n, 1).
         """
-        v = params[:, :4]  # (n, 4)
-        d = params[:, 4:]  # (n, 2)
+        v = params[:, :4].copy()  # (n, 4)
+        d = params[:, 4:].copy()  # (n, 2)
 
         # Attacker's perturbations
         signs = np.sign(g_func(X_s))  # (m ** 2, 1)
@@ -286,7 +286,7 @@ def bcad_utilities(rect_bounds, rng, m=20):
         norms = np.linalg.norm(defender_perturbs, axis=-1)  # (n, 1)
         larger_idxs = np.where(norms > margin)[0]
         defender_perturbs[larger_idxs] = (
-            defender_perturbs[larger_idxs] / norms[larger_idxs][..., None]
+            defender_perturbs[larger_idxs] / norms[larger_idxs][..., None] * margin
         )
 
         perturbed_X = X_s + attacker_perturbs + defender_perturbs  # (n, m ** 2, 2)
