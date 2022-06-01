@@ -619,8 +619,8 @@ def SUR(
 def ucb_mne(beta, domain, M):
     def acq(models, prev_successes, rng):
         """
-        Returns a pair of mixed strategies, and a batch of points to query next. Size of the batch will depend on the
-        size of the supports of the potential MNE found.
+        Returns a pair of mixed strategies, and a batch of points to query next. One no-regret pure strategy, and one
+        exploring pure strategy.
         :param models: List of N GPflow GPs.
         :param prev_successes:
         :return:
@@ -665,8 +665,18 @@ def ucb_mne(beta, domain, M):
         )  # (c, 1)
         a1_final_idx = a1_exp_idxs[np.argmax(a1_exp_ci_vals[:, 0])]
         a2_final_idx = a2_exp_idxs[np.argmax(a2_exp_ci_vals[:, 0])]
-        final_idxs.append(a1_final_idx)
-        final_idxs.append(a2_final_idx)
+
+        # Compute which exploring sample to take
+        a1_ucb_br_val = np.max(U1upper @ s2)
+        a2_ucb_br_val = np.max(s1 @ U2upper)
+        a1_lcb_val = s1 @ U1lower @ s2
+        a2_lcb_val = s1 @ U2lower @ s2
+        f_check_1 = a1_lcb_val - a1_ucb_br_val
+        f_check_2 = a2_lcb_val - a2_ucb_br_val
+        if f_check_1 <= f_check_2:
+            final_idxs.append(a1_final_idx)
+        else:
+            final_idxs.append(a2_final_idx)
 
         samples = domain[np.array(final_idxs)]
 

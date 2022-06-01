@@ -29,7 +29,7 @@ def rand():
     num_actions = 16
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 800
+    num_iters = 200
     beta = 2.0
     seed = 0
 
@@ -44,7 +44,7 @@ def gan():
     num_actions = 32
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 1200
+    num_iters = 400
     beta = 2.0
     seed = 0
 
@@ -59,7 +59,7 @@ def bcad():
     num_actions = 32
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 1600
+    num_iters = 600
     beta = 2.0
     seed = 0
 
