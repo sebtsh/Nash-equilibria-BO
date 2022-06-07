@@ -36,12 +36,12 @@ def rand():
     num_init_points = 5
     num_iters = 200
     beta = 2.0
-    n_samples_outer = 10
+    n_samples_outer = 100
     seed = 0
     known_best_val = None
     num_actions_discrete = 16
     immreg_skip_length = 20
-    inner_max_mode = "L-BFGS-B"
+    inner_max_mode = "sample_n_shrink"
 
 
 @ex.named_config
@@ -55,12 +55,12 @@ def gan():
     num_init_points = 5
     num_iters = 400
     beta = 2.0
-    n_samples_outer = 11
+    n_samples_outer = 100
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
     immreg_skip_length = 20
-    inner_max_mode = "L-BFGS-B"
+    inner_max_mode = "sample_n_shrink"
 
 
 @ex.named_config
@@ -74,12 +74,12 @@ def bcad():
     num_init_points = 5
     num_iters = 600
     beta = 2.0
-    n_samples_outer = 12
+    n_samples_outer = 100
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
     immreg_skip_length = 20
-    inner_max_mode = "L-BFGS-B"
+    inner_max_mode = "sample_n_shrink"
 
 
 @ex.automain

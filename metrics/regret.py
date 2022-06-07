@@ -18,7 +18,7 @@ def calc_regret_pne(
             agent_dims_bounds=agent_dims_bounds,
             mode=mode,
             rng=rng,
-            n_samples_outer=n_samples_outer,
+            n_samples_outer=200,
         )
     else:
         best_val = known_best_val
@@ -43,7 +43,7 @@ def calc_regret_pne(
             rng=rng,
             mode=maximize_mode,
         )
-        sample_regret.append(best_val - x_val)
+        sample_regret.append(np.maximum(best_val - x_val, 0.))
         cumu_regret.append(np.sum(sample_regret))
 
     return np.array(sample_regret), np.array(cumu_regret)
