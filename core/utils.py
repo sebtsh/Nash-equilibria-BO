@@ -188,7 +188,7 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=1
         new_samples = sobol_sequence(num_points=n_sobol, bounds=shrinked_bounds)
         f_new = f(new_samples)
         max_idx = np.argmax(f_new)
-        return samples[max_idx], f_new[max_idx]
+        return new_samples[max_idx], f_new[max_idx]
 
     else:
         raise Exception("Incorrect mode passed to maximize_fn")
