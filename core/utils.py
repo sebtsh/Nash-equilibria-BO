@@ -167,7 +167,7 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=1
         f_max = -res.fun
         return np.clip(x_max, bounds[:, 0], bounds[:, 1]), f_max
 
-    elif mode == "estimate":  # WARNING: this mode does not return a real point, only an estimated value
+    elif mode == "estimate":
         # Sobol sequence
         samples = sobol_sequence(num_points=n_sobol, bounds=bounds)
         f_x = f(samples)
@@ -176,6 +176,17 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=1
         f_max_estimate = np.mean(f_x) + 2 * np.std(f_x)
         f_max = np.max([f_max_samples, f_max_estimate])
         return None, f_max
+
+    elif mode == "sample_n_shrink":
+        # Sobol sequence
+        samples = sobol_sequence(num_points=n_sobol, bounds=bounds)
+        f_x = f(samples)
+        max_sample = samples[np.argmax(f_x)]
+        shrinked_bounds = shrink_bounds(point=max_sample,
+                                        bounds=bounds,
+                                        ratio=0.25)
+        new_samples = sobol_sequence(num_points=n_sobol, bounds=shrinked_bounds)
+        return np.max(f(new_samples))
 
     else:
         raise Exception("Incorrect mode passed to maximize_fn")
@@ -391,3 +402,26 @@ def get_maxmin_mode():
         return "random"
 
     return "DIRECT"
+
+
+def shrink_bounds(point, bounds, ratio):
+    """
+    Takes existing bounds and a point, and draws a smaller hypercube around the point with length as the ratio * length
+    of the original bounds of that dimension.
+    :param point: array of shape (dims, ).
+    :param bounds: array of shape (dims, 2), indicating the lower and upper bounds in each dimension.
+    :param ratio: float.
+    :return: array of shape (dims, 2).
+    """
+    lengths = bounds[:, 1] - bounds[:, 0]  # (dims, )
+    half_shrinked_lengths = (lengths * ratio) / 2
+
+    lowers = point - half_shrinked_lengths  # (dims, ) some might be beyond original bounds
+    uppers = point + half_shrinked_lengths  # (dims, ) some might be beyond original bounds
+
+    lower_slack = np.maximum(bounds[:, 0] - lowers, 0.)  # add this to uppers
+    upper_slack = np.maximum(uppers - bounds[:, 1], 0.)  # add this to lowers
+
+    corrected_lowers = np.maximum(lowers - upper_slack, bounds[:, 0])
+    corrected_uppers = np.minimum(uppers + lower_slack, bounds[:, 1])
+    return np.concatenate([corrected_lowers[:, None], corrected_uppers[:, None]], axis=-1)
