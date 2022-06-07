@@ -19,6 +19,7 @@ def get_acq_pure(
     domain=None,
     response_dicts=None,
     num_actions=None,
+    inner_max_mode=None
 ):
     if acq_name == "ucb_pne":
         return ucb_pne(
@@ -27,6 +28,7 @@ def get_acq_pure(
             agent_dims_bounds=agent_dims_bounds,
             mode=mode,
             n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode
         )
     elif acq_name == "prob_eq":
         if domain is None or response_dicts is None or num_actions is None:
@@ -65,7 +67,7 @@ def get_acq_mixed(acq_name, beta, domain, num_actions):
         raise Exception("Invalid acquisition name passed to get_acq_mixed")
 
 
-def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
+def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mode):
     def acq(models, rng, args_dict):
         """
         Returns 2 points to query next. First one is no-regret selection, second is exploring sample.
@@ -86,6 +88,7 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer):
             mode=mode,
             rng=rng,
             n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode
         )
         samples.append(noreg_sample)
 

@@ -41,6 +41,7 @@ def rand():
     known_best_val = None
     num_actions_discrete = 16
     immreg_skip_length = 20
+    inner_max_mode = "L-BFGS-B"
 
 
 @ex.named_config
@@ -59,6 +60,7 @@ def gan():
     known_best_val = 0.0
     num_actions_discrete = 32
     immreg_skip_length = 20
+    inner_max_mode = "L-BFGS-B"
 
 
 @ex.named_config
@@ -77,6 +79,7 @@ def bcad():
     known_best_val = 0.0
     num_actions_discrete = 32
     immreg_skip_length = 20
+    inner_max_mode = "L-BFGS-B"
 
 
 @ex.automain
@@ -95,6 +98,7 @@ def main(
     known_best_val,
     num_actions_discrete,
     immreg_skip_length,
+    inner_max_mode
 ):
     args = dict(sorted(locals().items()))
     print(f"Running with parameters {args}")
@@ -107,7 +111,7 @@ def main(
     agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
     rng = np.random.default_rng(seed)
     tf.random.set_seed(seed)
-    dir = "results/pne/" + utility_name + "/"
+    base_dir = "results/pne/" + utility_name + "/"
     filename = f"pne-{utility_name}-{acq_name}-seed{seed}"
 
     kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
@@ -161,6 +165,7 @@ def main(
         domain=domain,
         response_dicts=response_dicts,
         num_actions=num_actions_discrete,
+        inner_max_mode=inner_max_mode
     )
 
     final_data, total_time = bo_loop_pne(
@@ -193,7 +198,7 @@ def main(
         known_best_val=known_best_val,
     )
 
-    regrets_save_dir = dir + "regrets/"
+    regrets_save_dir = base_dir + "regrets/"
     plot_regret(
         regret=sample_regret,
         num_iters=num_iters,
@@ -255,7 +260,7 @@ def main(
             rng=rng,
             n_samples_outer=100,
         )
-        utils_save_dir = dir + "utils/"
+        utils_save_dir = base_dir + "utils/"
         plot_utilities_2d(
             u=u,
             bounds=bounds,
@@ -268,7 +273,7 @@ def main(
             known_best_point=known_best_point[None, :],
         )
 
-    pickles_save_dir = dir + "pickles/"
+    pickles_save_dir = base_dir + "pickles/"
     Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
         (final_data, sample_regret, cumu_regret, time_per_iter, args),

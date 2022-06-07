@@ -88,7 +88,7 @@ def main(
     agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
     rng = np.random.default_rng(seed)
     tf.random.set_seed(seed)
-    dir = "results/mne/" + utility_name + "/"
+    base_dir = "results/mne/" + utility_name + "/"
     filename = f"mne-{utility_name}-{acq_name}-seed{seed}"
 
     domain = discretize_domain(
@@ -154,7 +154,7 @@ def main(
     print(sample_regret)
     print("Cumulative regret:")
     print(cumu_regret)
-    regrets_save_dir = dir + "regrets/"
+    regrets_save_dir = base_dir + "regrets/"
     plot_regret(
         regret=sample_regret,
         num_iters=num_iters,
@@ -171,7 +171,7 @@ def main(
         save_dir=regrets_save_dir,
         filename=filename + "-cumu",
     )
-    pickles_save_dir = dir + "pickles/"
+    pickles_save_dir = base_dir + "pickles/"
     Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
         (

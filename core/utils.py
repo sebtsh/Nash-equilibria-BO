@@ -116,7 +116,7 @@ def all_subset_actions(actions):
     return list(powerset(actions))[1:]
 
 
-def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=100):
+def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=100, n_sobol=4096):
     """
     Approximately maximizes a function f using either DIRECT or sampling + L-BFGS-B method adapted from
     https://github.com/fmfn/BayesianOptimization.
@@ -127,6 +127,7 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=1
     :param n_warmup: int. Number of random samples.
     :param n_iter: int. Number of L-BFGS-B starting points.
     :param n_iter_direct:
+    :param n_sobol:
     :return: (Array of shape (d,), max_val).
     """
     d = len(bounds)
@@ -154,6 +155,7 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=1
             if -res.fun >= f_max:
                 x_max = res.x
                 f_max = -res.fun
+        return np.clip(x_max, bounds[:, 0], bounds[:, 1]), f_max
 
     elif mode == "DIRECT":
         res = direct_minimize(
@@ -163,10 +165,20 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=1
             raise Exception("DIRECT failed in maximize_fn")
         x_max = res.x
         f_max = -res.fun
+        return np.clip(x_max, bounds[:, 0], bounds[:, 1]), f_max
+
+    elif mode == "estimate":  # WARNING: this mode does not return a real point, only an estimated value
+        # Sobol sequence
+        samples = sobol_sequence(num_points=n_sobol, bounds=bounds)
+        f_x = f(samples)
+        f_max_samples = np.max(f_x)
+        # Assume normally distributed, then take the 2-sigma value
+        f_max_estimate = np.mean(f_x) + 2 * np.std(f_x)
+        f_max = np.max([f_max_samples, f_max_estimate])
+        return None, f_max
+
     else:
         raise Exception("Incorrect mode passed to maximize_fn")
-
-    return np.clip(x_max, bounds[:, 0], bounds[:, 1]), f_max
 
 
 def get_agent_dims_bounds(agent_dims):
@@ -193,6 +205,7 @@ def maxmin_fn(
     mode,
     rng,
     n_samples_outer=100,
+    inner_max_mode="L-BFGS-B",
 ):
     """
 
@@ -203,6 +216,7 @@ def maxmin_fn(
     :param rng:
     :param mode: str. Either 'DIRECT' or 'random'.
     :param n_samples_outer:
+    :param inner_max_mode:
     :return:
     """
     dims = len(bounds)
@@ -242,7 +256,7 @@ def maxmin_fn(
                     ),
                     bounds=bounds[start_dim:end_dim],
                     rng=rng,
-                    mode="L-BFGS-B",
+                    mode=inner_max_mode,
                     n_warmup=100,
                     n_iter=5,
                 )
