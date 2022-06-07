@@ -116,7 +116,7 @@ def all_subset_actions(actions):
     return list(powerset(actions))[1:]
 
 
-def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=100, n_sobol=4096):
+def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=100, n_sobol=2**13):
     """
     Approximately maximizes a function f using either DIRECT or sampling + L-BFGS-B method adapted from
     https://github.com/fmfn/BayesianOptimization.
@@ -272,7 +272,6 @@ def maxmin_fn(
         return samples[max_idx], max_val
 
     elif mode == "DIRECT":
-
         def obj(s):
             # print("Calling inner obj")
             agent_max_inner_vals = []
@@ -295,7 +294,7 @@ def maxmin_fn(
                     ),
                     bounds=bounds[start_dim:end_dim],
                     rng=rng,
-                    mode="L-BFGS-B",
+                    mode=inner_max_mode,
                     n_warmup=100,
                     n_iter=5,
                 )
