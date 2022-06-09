@@ -53,7 +53,7 @@ def gan():
 def bcad():
     utility_name = "bcad"
     acq_name = "ucb_mne"
-    agent_dims = [4, 2]  # this determines num_agents and dims
+    agent_dims = [3, 2]  # this determines num_agents and dims
     ls = np.array([1.5, 0.5, 1.5, 0.5, 0.5, 0.5])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     num_actions = 32

@@ -224,7 +224,7 @@ def bcad_utilities(rect_bounds, rng, m=20):
     :param rect_bounds: array of shape (2, 2).
     :param rng: NumPy rng object.
     :param m: int.
-    :return: List of 2 Callables that each take in an array of shape (n, 6) and return an array of shape (n, 1).
+    :return: List of 2 Callables that each take in an array of shape (n, 5) and return an array of shape (n, 1).
     """
     margin = 1.0
     rect = sample_rectangle_2d(rect_bounds, rng)
@@ -255,18 +255,18 @@ def bcad_utilities(rect_bounds, rng, m=20):
     def utility_attacker(params):
         """
         Deterministic estimate of attacker's utility. Negative of the defender's utility.
-        :param params: array of shape (n, 6).
+        :param params: array of shape (n, 5).
         :return: array of shape (n, 1).
         """
-        v = params[:, :4].copy()  # (n, 4)
-        d = params[:, 4:].copy()  # (n, 2)
+        v = params[:, :3].copy()  # (n, 3)
+        d = params[:, 3:].copy()  # (n, 2)
 
         # Attacker's perturbations
         signs = np.sign(g_func(X_s))  # (m ** 2, 1)
         b_vals = np.concatenate(
             [
                 v[:, 0:1, None] * X_s[:, 0:1] + v[:, 1:2, None] * X_s[:, 1:2],
-                v[:, 2:3, None] * X_s[:, 0:1] + v[:, 3:4, None] * X_s[:, 1:2],
+                v[:, 2:3, None] * (X_s[:, 0:1] + X_s[:, 1:2]),
             ],
             axis=-1,
         )  # (n, m ** 2, 2)
