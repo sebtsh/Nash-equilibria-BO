@@ -53,7 +53,7 @@ def gan():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 400
+    num_iters = 800
     beta = 2.0
     n_samples_outer = 100
     seed = 0
@@ -72,7 +72,7 @@ def bcad():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 600
+    num_iters = 800
     beta = 2.0
     n_samples_outer = 100
     seed = 0
