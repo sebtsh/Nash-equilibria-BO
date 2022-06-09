@@ -4,6 +4,7 @@ from pathlib import Path
 
 from core.pne import best_response_payoff_pure_discrete
 from core.utils import cross_product
+from core.models import create_ci_funcs
 
 
 def plot_utilities_2d(
@@ -59,8 +60,14 @@ def plot_utilities_2d(
             known_best_point[:, 0],
             "*",
             markersize=10,
-            c="white",
+            c="black",
         )
+        ax1.axvline(x=known_best_point[:, 1],
+                    ymin=ymin,
+                    ymax=ymax,
+                    c='black',
+                    linestyle='--',
+                    alpha=0.5)
 
     im2 = ax2.imshow(
         u2_reshaped,
@@ -80,8 +87,115 @@ def plot_utilities_2d(
             known_best_point[:, 0],
             "*",
             markersize=10,
-            c="white",
+            c="black",
         )
+        ax2.axhline(y=known_best_point[:, 0],
+                    xmin=xmin,
+                    xmax=xmax,
+                    c='black',
+                    linestyle='--',
+                    alpha=0.5)
+
+    fig.tight_layout()
+    if save:
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_dir + filename, bbox_inches="tight")
+    if show_plot:
+        plt.show()
+
+
+def plot_fi_2d(
+    models,
+    beta,
+    bounds,
+    num_discrete=200,
+    title="",
+    cmap="Spectral",
+    save=False,
+    save_dir="",
+    filename="",
+    show_plot=True,
+    known_best_point=None,
+):
+    ucb_funcs, lcb_funcs = create_ci_funcs(models, beta)
+    ymin, ymax = bounds[0]
+    xmin, xmax = bounds[1]
+
+    actions1 = np.linspace(ymin, ymax, num_discrete)
+    actions2 = np.linspace(xmin, xmax, num_discrete)
+    domain = cross_product(actions1[:, None], actions2[:, None])
+
+    # Calculate f_i for agent 1 only
+    xlabel = "Agent 2 actions"
+    ylabel = "Agent 1 actions"
+    # print(f"domain: {np.reshape(domain, [num_discrete, num_discrete, 2])}")
+    ucb_vals = ucb_funcs[0](domain)
+    ucb_reshaped = np.reshape(ucb_vals, [num_discrete, num_discrete])
+    # print(f"u1: {u1_reshaped}")
+    lcb_vals = lcb_funcs[0](domain)
+    lcb_reshaped = np.reshape(lcb_vals, [num_discrete, num_discrete])
+    # print(f"u2: {u2_reshaped}")
+    f1_reshaped = ucb_reshaped - np.max(lcb_reshaped, axis=0, keepdims=True)
+
+    offset = (1 / num_discrete) / 2
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig.suptitle(title, size=20)
+    fig.set_size_inches(8, 4)
+    fig.set_dpi(200)
+
+    im1 = ax1.imshow(
+        f1_reshaped,
+        interpolation="nearest",
+        extent=(ymin - offset, ymax + offset, xmax + offset, xmin - offset),
+        origin="upper",
+        cmap=cmap,
+        # aspect=(ymax - ymin) / (xmax - xmin),
+    )
+    ax1.set_title("$\\widehat f_{1, t-1}$", size=16)
+    ax1.set_xlabel(xlabel, size=12)
+    ax1.set_ylabel(ylabel, size=12)
+    fig.colorbar(im1, ax=ax1)
+    if known_best_point is not None:
+        ax1.plot(
+            known_best_point[:, 1],
+            known_best_point[:, 0],
+            "*",
+            markersize=10,
+            c="black",
+        )
+        ax1.axvline(x=known_best_point[:, 1],
+                    ymin=ymin,
+                    ymax=ymax,
+                    c='black',
+                    linestyle='--',
+                    alpha=0.5)
+
+    im2 = ax2.imshow(
+        ucb_reshaped,
+        interpolation="None",
+        extent=(ymin - offset, ymax + offset, xmax + offset, xmin - offset),
+        origin="upper",
+        cmap=cmap,
+        # aspect=(ymax - ymin) / (xmax - xmin),
+    )
+    ax2.set_title("\\widehat u_{1, t-1}", size=16)
+    ax2.set_xlabel(xlabel, size=12)
+    ax2.set_ylabel(ylabel, size=12)
+    fig.colorbar(im2, ax=ax2)
+    if known_best_point is not None:
+        ax2.plot(
+            known_best_point[:, 1],
+            known_best_point[:, 0],
+            "*",
+            markersize=10,
+            c="black",
+        )
+        ax2.axhline(y=known_best_point[:, 0],
+                    xmin=xmin,
+                    xmax=xmax,
+                    c='black',
+                    linestyle='--',
+                    alpha=0.5)
 
     fig.tight_layout()
     if save:
