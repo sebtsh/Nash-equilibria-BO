@@ -687,9 +687,13 @@ def ucb_mne(beta, domain, M):
         else:
             final_idxs.append(a2_final_idx)
 
-        samples = domain[np.array(final_idxs)]
+        pure_strategies = domain[np.array(final_idxs)]
 
-        return samples, (s1, s2), prev_successes
+        # Select the strategy with the highest predictive variance to sample
+        _, variances = models[0].posterior().predict_f(pure_strategies)  # (2, 1)
+        sampled_pure_strategy = pure_strategies[np.argmax(np.squeeze(variances))]
+
+        return (s1, s2), sampled_pure_strategy, prev_successes
 
     return acq
 

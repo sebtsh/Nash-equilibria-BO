@@ -59,7 +59,7 @@ def bcad():
     num_actions = 32
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 600
+    num_iters = 400
     beta = 2.0
     seed = 0
 

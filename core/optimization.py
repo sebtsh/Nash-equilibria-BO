@@ -104,7 +104,6 @@ def bo_loop_mne(
         sampled_strategies.append(sampled_pure_strategy)
     end = process_time()
     total_time = end - start
-    reported_strategies = np.array(reported_strategies)
     sampled_strategies = np.array(sampled_strategies)
     # if plot:
     #     plot_models_2d(
