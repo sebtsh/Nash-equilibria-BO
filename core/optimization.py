@@ -30,26 +30,28 @@ def bo_loop_pne(
     :return:
     """
     data = init_data
-    sample_buffer = np.zeros((0, 0))
+    reported_strategies = []
+    sampled_strategies = []
     start = process_time()
     for _ in trange(num_iters):
-        if len(sample_buffer) == 0:
-            models = create_models(
-                num_agents=num_agents,
-                data=data,
-                kernel=kernel,
-                noise_variance=noise_variance,
-            )
-            sample_buffer, args_dict = acquisition(
-                models=models, rng=rng, args_dict=args_dict
-            )  # (n, N)
-        x_new = sample_buffer[0][None, :]
-        sample_buffer = np.delete(sample_buffer, 0, axis=0)
-        y_new = observer(x_new)
-        data = merge_data(data, (x_new, y_new))
+        models = create_models(
+            num_agents=num_agents,
+            data=data,
+            kernel=kernel,
+            noise_variance=noise_variance,
+        )
+        reported_strategy, sampled_strategy, args_dict = acquisition(
+            models=models, rng=rng, args_dict=args_dict
+        )  # acquisitions must return 1-D arrays of shape (dims, )
+        y_new = observer(sampled_strategy[None, :])
+        data = merge_data(data, (sampled_strategy[None, :], y_new))
+        reported_strategies.append(reported_strategy)
+        sampled_strategies.append(sampled_strategy)
     end = process_time()
     total_time = end - start
-    return data, total_time
+    reported_strategies = np.array(reported_strategies)
+    sampled_strategies = np.array(sampled_strategies)
+    return reported_strategies, sampled_strategies, total_time
 
 
 def bo_loop_mne(
@@ -81,30 +83,29 @@ def bo_loop_mne(
     :return: Final dataset, tuple (X, Y).
     """
     data = init_data
-    chosen_strategies = []
-    sample_buffer = np.zeros((0, 0))
-    strategy_buffer = None
+    reported_strategies = []
+    sampled_strategies = []
     prev_successes = []
     start = process_time()
     for _ in trange(num_iters):
         # print(f"prev_successes: {prev_successes}")
-        if len(sample_buffer) == 0:
-            models = create_models(
-                num_agents=num_agents,
-                data=data,
-                kernel=kernel,
-                noise_variance=noise_variance,
-            )
-            sample_buffer, strategy_buffer, prev_successes = acquisition(
-                models, prev_successes, rng
-            )  # (n, N)
-        x_new = sample_buffer[0][None, :]
-        sample_buffer = np.delete(sample_buffer, 0, axis=0)
-        y_new = observer(x_new)
-        data = merge_data(data, (x_new, y_new))
-        chosen_strategies.append(strategy_buffer)
+        models = create_models(
+            num_agents=num_agents,
+            data=data,
+            kernel=kernel,
+            noise_variance=noise_variance,
+        )
+        reported_mixed_strategy, sampled_pure_strategy, prev_successes = acquisition(
+            models, prev_successes, rng
+        )  # acquisitions need to return (s1, s2) and an array of shape (dims,)
+        y_new = observer(sampled_pure_strategy[None, :])
+        data = merge_data(data, (sampled_pure_strategy[None, :], y_new))
+        reported_strategies.append(reported_mixed_strategy)
+        sampled_strategies.append(sampled_pure_strategy)
     end = process_time()
     total_time = end - start
+    reported_strategies = np.array(reported_strategies)
+    sampled_strategies = np.array(sampled_strategies)
     # if plot:
     #     plot_models_2d(
     #         models=models,
@@ -121,4 +122,4 @@ def bo_loop_mne(
     #         show_plot=False,
     #     )
 
-    return data, chosen_strategies, total_time
+    return reported_strategies, sampled_strategies, total_time

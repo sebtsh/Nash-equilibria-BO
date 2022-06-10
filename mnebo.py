@@ -134,7 +134,7 @@ def main(
         acq_name=acq_name, beta=beta, domain=domain, num_actions=num_actions
     )
 
-    final_data, chosen_strategies, total_time = bo_loop_mne(
+    reported_strategies, sampled_strategies, total_time = bo_loop_mne(
         num_agents=num_agents,
         init_data=init_data,
         observer=observer,
@@ -148,7 +148,7 @@ def main(
     time_per_iter = total_time / num_iters
 
     sample_regret, cumu_regret = calc_regret_mne(
-        strategies=chosen_strategies, U1=U1, U2=U2
+        strategies=reported_strategies, U1=U1, U2=U2
     )
     print("Immediate regret:")
     print(sample_regret)
@@ -175,8 +175,8 @@ def main(
     Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
         (
-            final_data,
-            chosen_strategies,
+            reported_strategies,
+            sampled_strategies,
             sample_regret,
             cumu_regret,
             time_per_iter,

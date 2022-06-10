@@ -135,8 +135,14 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mo
         assert exploring_scores.shape == (N,)
         exploring_sample = pot_exploring_samples[np.argmin(exploring_scores)]
         samples.append(exploring_sample)
+        strategies = np.array(samples)  # (2, dims)
 
-        return np.array(samples), args_dict
+        # Select the strategy with the highest predictive variance to sample
+        _, variances = models[0].posterior().predict_f(strategies)  # (2, 1)
+        sampled_strategy = strategies[np.argmax(np.squeeze(variances))]
+        reported_strategy = noreg_sample
+
+        return reported_strategy, sampled_strategy, args_dict
 
     return acq, {}
 

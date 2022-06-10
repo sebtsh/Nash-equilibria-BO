@@ -8,7 +8,7 @@ from core.models import create_models, create_mean_funcs
 
 
 def calc_regret_pne(
-    u, data, bounds, agent_dims_bounds, mode, rng, n_samples_outer, known_best_val
+    u, data, bounds, agent_dims_bounds, mode, rng, known_best_val
 ):
     if known_best_val is None:
         _, best_val = maxmin_fn(
@@ -23,7 +23,7 @@ def calc_regret_pne(
     else:
         best_val = known_best_val
 
-    X, _ = data
+    X = data
     sample_regret = []
     cumu_regret = []
 

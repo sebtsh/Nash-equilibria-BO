@@ -14,8 +14,8 @@ from core.utils import (
     get_maxmin_mode,
     maxmin_fn,
 )
-from metrics.regret import calc_regret_pne, calc_imm_regret_pne
-from metrics.plotting import plot_utilities_2d, plot_regret, plot_imm_regret
+from metrics.regret import calc_regret_pne
+from metrics.plotting import plot_utilities_2d, plot_regret
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from pathlib import Path
@@ -36,7 +36,7 @@ def rand():
     num_init_points = 5
     num_iters = 200
     beta = 2.0
-    n_samples_outer = 100
+    n_samples_outer = 50
     seed = 0
     known_best_val = None
     num_actions_discrete = 16
@@ -55,7 +55,7 @@ def gan():
     num_init_points = 5
     num_iters = 800
     beta = 2.0
-    n_samples_outer = 100
+    n_samples_outer = 50
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
@@ -74,7 +74,7 @@ def bcad():
     num_init_points = 5
     num_iters = 800
     beta = 2.0
-    n_samples_outer = 100
+    n_samples_outer = 50
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
@@ -168,7 +168,7 @@ def main(
         inner_max_mode=inner_max_mode
     )
 
-    final_data, total_time = bo_loop_pne(
+    reported_strategies, sampled_strategies, total_time = bo_loop_pne(
         num_agents=num_agents,
         init_data=init_data,
         observer=observer,
@@ -180,75 +180,71 @@ def main(
         args_dict=args_dict,
     )
 
-    final_data_minus_init = (
-        final_data[0][num_init_points:],
-        final_data[1][num_init_points:],
-    )
     time_per_iter = total_time / num_iters
 
-    print("Computing regret")
-    sample_regret, cumu_regret = calc_regret_pne(
+    print("Computing regret for reported strategies")
+    reported_sample_regret, reported_cumu_regret = calc_regret_pne(
         u=u,
-        data=final_data_minus_init,
+        data=reported_strategies,
         bounds=bounds,
         agent_dims_bounds=agent_dims_bounds,
         mode=maxmin_mode,
         rng=rng,
-        n_samples_outer=n_samples_outer + 5,
         known_best_val=known_best_val,
     )
 
     regrets_save_dir = base_dir + "regrets/"
     plot_regret(
-        regret=sample_regret,
+        regret=reported_sample_regret,
         num_iters=num_iters,
-        title="Sample regret (all samples)",
+        title="Sample pure Nash regret (reported)",
         save=True,
         save_dir=regrets_save_dir,
-        filename=filename + "-sample",
+        filename=filename + "-reported-sample",
     )
     plot_regret(
-        regret=cumu_regret,
+        regret=reported_cumu_regret,
         num_iters=num_iters,
-        title="Cumulative regret (all samples)",
+        title="Cumulative pure Nash regret (reported)",
         save=True,
         save_dir=regrets_save_dir,
-        filename=filename + "-cumu",
+        filename=filename + "-reported-cumu",
     )
-    print("Regrets of all samples")
-    print(sample_regret)
-    print(cumu_regret)
+    print("Regrets of all reported strategies")
+    print(reported_sample_regret)
+    print(reported_cumu_regret)
 
-    if acq_name == "ucb_pne":
-        noreg_seq = np.array(
-            [
-                j * (num_agents + 1)
-                for j in range(int(np.ceil(num_iters / (num_agents + 1))))
-            ],
-            dtype=np.int32,
-        )
-        plot_regret(
-            regret=sample_regret[noreg_seq],
-            num_iters=len(noreg_seq),
-            title="Sample regret (no-regret sequence)",
-            save=True,
-            save_dir=regrets_save_dir,
-            filename=filename + "-samplenoreg",
-        )
-        noreg_cumu_regret = []
-        for i in range(len(noreg_seq)):
-            noreg_cumu_regret.append(np.sum(sample_regret[noreg_seq][: i + 1]))
-        plot_regret(
-            regret=noreg_cumu_regret,
-            num_iters=len(noreg_seq),
-            title="Cumulative regret (no-regret sequence)",
-            save=True,
-            save_dir=regrets_save_dir,
-            filename=filename + "-cumunoreg",
-        )
-        print("Regrets of no-regret sequence")
-        print(sample_regret[noreg_seq])
-        print(cumu_regret[noreg_seq])
+    print("Computing regret for sampled strategies")
+    sampled_sample_regret, sampled_cumu_regret = calc_regret_pne(
+        u=u,
+        data=sampled_strategies,
+        bounds=bounds,
+        agent_dims_bounds=agent_dims_bounds,
+        mode=maxmin_mode,
+        rng=rng,
+        known_best_val=known_best_val,
+    )
+
+    regrets_save_dir = base_dir + "regrets/"
+    plot_regret(
+        regret=sampled_sample_regret,
+        num_iters=num_iters,
+        title="Sample pure Nash regret (sampled)",
+        save=True,
+        save_dir=regrets_save_dir,
+        filename=filename + "-sampled-sample",
+    )
+    plot_regret(
+        regret=sampled_cumu_regret,
+        num_iters=num_iters,
+        title="Cumulative pure Nash regret (sampled)",
+        save=True,
+        save_dir=regrets_save_dir,
+        filename=filename + "-sampled-cumu",
+    )
+    print("Regrets of all sampled strategies")
+    print(sampled_sample_regret)
+    print(sampled_cumu_regret)
 
     if dims == 2:
         known_best_point, _ = _, best_val = maxmin_fn(
@@ -276,39 +272,8 @@ def main(
     pickles_save_dir = base_dir + "pickles/"
     Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
-        (final_data, sample_regret, cumu_regret, time_per_iter, args),
+        (reported_strategies, sampled_strategies, reported_sample_regret, reported_cumu_regret, time_per_iter, args),
         open(pickles_save_dir + f"{filename}.p", "wb"),
-    )
-
-    print("Calculating immediate regret")
-    imm_regret = calc_imm_regret_pne(
-        u=u,
-        data=final_data,
-        num_agents=num_agents,
-        num_init_points=num_init_points,
-        kernel=kernel,
-        noise_variance=noise_variance,
-        bounds=bounds,
-        agent_dims_bounds=agent_dims_bounds,
-        mode=maxmin_mode,
-        rng=rng,
-        n_samples_outer=n_samples_outer,
-        known_best_val=known_best_val,
-        skip_length=immreg_skip_length,
-    )
-    plot_imm_regret(
-        regret=imm_regret,
-        num_iters=num_iters,
-        skip_length=immreg_skip_length,
-        title="Immediate regret",
-        save=True,
-        save_dir=regrets_save_dir,
-        filename=filename + "-immreg",
-    )
-
-    pickle.dump(
-        (final_data, sample_regret, cumu_regret, time_per_iter, args, imm_regret),
-        open(pickles_save_dir + f"{filename}-2.p", "wb"),
     )
 
     print(f"Completed run {run_id} with parameters {args}")
