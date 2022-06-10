@@ -40,7 +40,6 @@ def rand():
     seed = 0
     known_best_val = None
     num_actions_discrete = 16
-    immreg_skip_length = 20
     inner_max_mode = "sample_n_shrink"
 
 
@@ -53,13 +52,12 @@ def gan():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 800
+    num_iters = 600
     beta = 2.0
     n_samples_outer = 50
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
-    immreg_skip_length = 20
     inner_max_mode = "sample_n_shrink"
 
 
@@ -72,13 +70,12 @@ def bcad():
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
     noise_variance = 0.001
     num_init_points = 5
-    num_iters = 800
+    num_iters = 600
     beta = 2.0
     n_samples_outer = 50
     seed = 0
     known_best_val = 0.0
     num_actions_discrete = 32
-    immreg_skip_length = 20
     inner_max_mode = "sample_n_shrink"
 
 
@@ -97,7 +94,6 @@ def main(
     seed,
     known_best_val,
     num_actions_discrete,
-    immreg_skip_length,
     inner_max_mode
 ):
     args = dict(sorted(locals().items()))
