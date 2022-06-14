@@ -5,7 +5,7 @@ from statsmodels.sandbox.distributions.extras import mvnormcdf
 from core.pne import find_PNE_discrete
 from core.mne import SEM, get_strategies_and_support
 from core.utils import cross_product, maximize_fn, maxmin_fn
-from core.models import create_ci_funcs
+from core.models import create_ci_funcs, create_mean_funcs
 
 
 def get_acq_pure(
@@ -19,7 +19,7 @@ def get_acq_pure(
     domain=None,
     response_dicts=None,
     num_actions=None,
-    inner_max_mode=None
+    inner_max_mode=None,
 ):
     if acq_name == "ucb_pne":
         return ucb_pne(
@@ -28,7 +28,7 @@ def get_acq_pure(
             agent_dims_bounds=agent_dims_bounds,
             mode=mode,
             n_samples_outer=n_samples_outer,
-            inner_max_mode=inner_max_mode
+            inner_max_mode=inner_max_mode,
         )
     elif acq_name == "prob_eq":
         if domain is None or response_dicts is None or num_actions is None:
@@ -88,7 +88,7 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mo
             mode=mode,
             rng=rng,
             n_samples_outer=n_samples_outer,
-            inner_max_mode=inner_max_mode
+            inner_max_mode=inner_max_mode,
         )
         samples.append(noreg_sample)
 
@@ -126,7 +126,9 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mo
                 n_warmup=100,
                 n_iter=5,
             )
-            pot_exploring_samples.append(np.concatenate([s_before, max_ucb_sample, s_after]))
+            pot_exploring_samples.append(
+                np.concatenate([s_before, max_ucb_sample, s_after])
+            )
             pot_exploring_vals.append(max_ucb_val)
 
             noreg_lcb_vals.append(np.squeeze(lcb_funcs[i](noreg_sample[None, :])))
@@ -152,6 +154,8 @@ def BN(
     agent_dims_bounds,
     mode,
     gamma,
+    n_samples_outer,
+    inner_max_mode,
     explore_prob=0.05,
     n_samples_estimate=1000,
 ):
@@ -228,12 +232,11 @@ def BN(
                 assert estimated_regs.shape == (N, b)
                 return -np.max(estimated_regs, axis=0)[:, None]  # (b, 1)
 
-            ret_sample, _ = maximize_fn(
+            sampled_strategy, _ = maximize_fn(
                 f=obj,
                 bounds=bounds,
                 rng=rng,
                 mode=max_mode,
-                n_warmup=10,
             )
         else:
             # Pick point with highest uncertainty
@@ -248,15 +251,27 @@ def BN(
                 assert stds.shape == (N, b)
                 return np.max(stds, axis=0)[:, None]  # (b, 1)
 
-            ret_sample, _ = maximize_fn(
+            sampled_strategy, _ = maximize_fn(
                 f=obj,
                 bounds=bounds,
                 rng=rng,
                 mode=max_mode,
-                n_warmup=100,
             )
 
-        return ret_sample[None, :], args_dict
+        # Report NE computed using predictive mean
+        mean_funcs = create_mean_funcs(models=models)
+        reported_strategy, _ = maxmin_fn(
+            outer_funcs=mean_funcs,
+            inner_funcs=mean_funcs,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=mode,
+            rng=rng,
+            n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode,
+        )
+
+        return reported_strategy, sampled_strategy, args_dict
 
     return acq, {}
 
@@ -316,7 +331,16 @@ def compute_prob_eq_vals(X_idxs, models, domain, num_actions, response_dicts):
     return prob_eq_vals
 
 
-def prob_eq(domain, response_dicts, num_actions):
+def prob_eq(
+    domain,
+    response_dicts,
+    num_actions,
+    bounds,
+    agent_dims_bounds,
+    mode,
+    n_samples_outer,
+    inner_max_mode,
+):
     """
     Probability of Equilibrium acquisition from Picheny et. al. (2018). Requires a discretization of the continuous
     domain, and calculated response dicts.
@@ -337,7 +361,22 @@ def prob_eq(domain, response_dicts, num_actions):
             num_actions=num_actions,
             response_dicts=response_dicts,
         )
-        return domain[np.argmax(prob_eq_vals)][None, :], args_dict
+        sampled_strategy = domain[np.argmax(prob_eq_vals)][None, :]
+
+        # Report NE computed using predictive mean
+        mean_funcs = create_mean_funcs(models=models)
+        reported_strategy, _ = maxmin_fn(
+            outer_funcs=mean_funcs,
+            inner_funcs=mean_funcs,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=mode,
+            rng=rng,
+            n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode,
+        )
+
+        return reported_strategy, sampled_strategy, args_dict
 
     return acq, {}
 

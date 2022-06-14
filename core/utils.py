@@ -116,7 +116,9 @@ def all_subset_actions(actions):
     return list(powerset(actions))[1:]
 
 
-def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=100, n_sobol=2**13):
+def maximize_fn(
+    f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=100, n_sobol=2**13
+):
     """
     Approximately maximizes a function f using either DIRECT or sampling + L-BFGS-B method adapted from
     https://github.com/fmfn/BayesianOptimization.
@@ -182,9 +184,7 @@ def maximize_fn(f, bounds, rng, mode, n_warmup=10000, n_iter=10, n_iter_direct=1
         samples = sobol_sequence(num_points=n_sobol, bounds=bounds)
         f_x = f(samples)
         max_sample = samples[np.argmax(f_x)]
-        shrinked_bounds = shrink_bounds(point=max_sample,
-                                        bounds=bounds,
-                                        ratio=0.25)
+        shrinked_bounds = shrink_bounds(point=max_sample, bounds=bounds, ratio=0.25)
         new_samples = sobol_sequence(num_points=n_sobol, bounds=shrinked_bounds)
         f_new = f(new_samples)
         max_idx = np.argmax(f_new)
@@ -285,6 +285,7 @@ def maxmin_fn(
         return samples[max_idx], max_val
 
     elif mode == "DIRECT":
+
         def obj(s):
             # print("Calling inner obj")
             agent_max_inner_vals = []
@@ -418,12 +419,18 @@ def shrink_bounds(point, bounds, ratio):
     lengths = bounds[:, 1] - bounds[:, 0]  # (dims, )
     half_shrinked_lengths = (lengths * ratio) / 2
 
-    lowers = point - half_shrinked_lengths  # (dims, ) some might be beyond original bounds
-    uppers = point + half_shrinked_lengths  # (dims, ) some might be beyond original bounds
+    lowers = (
+        point - half_shrinked_lengths
+    )  # (dims, ) some might be beyond original bounds
+    uppers = (
+        point + half_shrinked_lengths
+    )  # (dims, ) some might be beyond original bounds
 
-    lower_slack = np.maximum(bounds[:, 0] - lowers, 0.)  # add this to uppers
-    upper_slack = np.maximum(uppers - bounds[:, 1], 0.)  # add this to lowers
+    lower_slack = np.maximum(bounds[:, 0] - lowers, 0.0)  # add this to uppers
+    upper_slack = np.maximum(uppers - bounds[:, 1], 0.0)  # add this to lowers
 
     corrected_lowers = np.maximum(lowers - upper_slack, bounds[:, 0])
     corrected_uppers = np.minimum(uppers + lower_slack, bounds[:, 1])
-    return np.concatenate([corrected_lowers[:, None], corrected_uppers[:, None]], axis=-1)
+    return np.concatenate(
+        [corrected_lowers[:, None], corrected_uppers[:, None]], axis=-1
+    )

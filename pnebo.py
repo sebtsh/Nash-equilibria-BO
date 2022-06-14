@@ -94,7 +94,7 @@ def main(
     seed,
     known_best_val,
     num_actions_discrete,
-    inner_max_mode
+    inner_max_mode,
 ):
     args = dict(sorted(locals().items()))
     print(f"Running with parameters {args}")
@@ -161,7 +161,7 @@ def main(
         domain=domain,
         response_dicts=response_dicts,
         num_actions=num_actions_discrete,
-        inner_max_mode=inner_max_mode
+        inner_max_mode=inner_max_mode,
     )
 
     reported_strategies, sampled_strategies, total_time = bo_loop_pne(
@@ -268,7 +268,14 @@ def main(
     pickles_save_dir = base_dir + "pickles/"
     Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
-        (reported_strategies, sampled_strategies, reported_sample_regret, reported_cumu_regret, time_per_iter, args),
+        (
+            reported_strategies,
+            sampled_strategies,
+            reported_sample_regret,
+            reported_cumu_regret,
+            time_per_iter,
+            args,
+        ),
         open(pickles_save_dir + f"{filename}.p", "wb"),
     )
 

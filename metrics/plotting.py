@@ -62,12 +62,14 @@ def plot_utilities_2d(
             markersize=10,
             c="black",
         )
-        ax1.axvline(x=known_best_point[:, 1],
-                    ymin=ymin,
-                    ymax=ymax,
-                    c='black',
-                    linestyle='--',
-                    alpha=0.5)
+        ax1.axvline(
+            x=known_best_point[:, 1],
+            ymin=ymin,
+            ymax=ymax,
+            c="black",
+            linestyle="--",
+            alpha=0.5,
+        )
 
     im2 = ax2.imshow(
         u2_reshaped,
@@ -89,12 +91,14 @@ def plot_utilities_2d(
             markersize=10,
             c="black",
         )
-        ax2.axhline(y=known_best_point[:, 0],
-                    xmin=xmin,
-                    xmax=xmax,
-                    c='black',
-                    linestyle='--',
-                    alpha=0.5)
+        ax2.axhline(
+            y=known_best_point[:, 0],
+            xmin=xmin,
+            xmax=xmax,
+            c="black",
+            linestyle="--",
+            alpha=0.5,
+        )
 
     fig.tight_layout()
     if save:
@@ -163,12 +167,14 @@ def plot_fi_2d(
             markersize=10,
             c="black",
         )
-        ax1.axvline(x=known_best_point[:, 1],
-                    ymin=ymin,
-                    ymax=ymax,
-                    c='black',
-                    linestyle='--',
-                    alpha=0.5)
+        ax1.axvline(
+            x=known_best_point[:, 1],
+            ymin=ymin,
+            ymax=ymax,
+            c="black",
+            linestyle="--",
+            alpha=0.5,
+        )
 
     im2 = ax2.imshow(
         ucb_reshaped,
@@ -190,12 +196,14 @@ def plot_fi_2d(
             markersize=10,
             c="black",
         )
-        ax2.axhline(y=known_best_point[:, 0],
-                    xmin=xmin,
-                    xmax=xmax,
-                    c='black',
-                    linestyle='--',
-                    alpha=0.5)
+        ax2.axhline(
+            y=known_best_point[:, 0],
+            xmin=xmin,
+            xmax=xmax,
+            c="black",
+            linestyle="--",
+            alpha=0.5,
+        )
 
     fig.tight_layout()
     if save:

@@ -7,9 +7,7 @@ from core.pne import evaluate_sample
 from core.models import create_models, create_mean_funcs
 
 
-def calc_regret_pne(
-    u, data, bounds, agent_dims_bounds, mode, rng, known_best_val
-):
+def calc_regret_pne(u, data, bounds, agent_dims_bounds, mode, rng, known_best_val):
     if known_best_val is None:
         _, best_val = maxmin_fn(
             outer_funcs=u,
@@ -43,7 +41,7 @@ def calc_regret_pne(
             rng=rng,
             mode=maximize_mode,
         )
-        sample_regret.append(np.maximum(best_val - x_val, 0.))
+        sample_regret.append(np.maximum(best_val - x_val, 0.0))
         cumu_regret.append(np.sum(sample_regret))
 
     return np.array(sample_regret), np.array(cumu_regret)
