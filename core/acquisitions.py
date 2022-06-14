@@ -34,7 +34,14 @@ def get_acq_pure(
         if domain is None or response_dicts is None or num_actions is None:
             raise Exception("None params passed to prob_eq")
         return prob_eq(
-            domain=domain, response_dicts=response_dicts, num_actions=num_actions
+            domain=domain,
+            response_dicts=response_dicts,
+            num_actions=num_actions,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=mode,
+            n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode,
         )
     elif acq_name == "SUR":
         if domain is None or response_dicts is None or num_actions is None:
@@ -51,6 +58,8 @@ def get_acq_pure(
             agent_dims_bounds=agent_dims_bounds,
             mode=mode,
             gamma=beta,
+            n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode,
         )
     else:
         raise Exception("Invalid acquisition name passed to get_acq_pure")
