@@ -370,7 +370,7 @@ def prob_eq(
             num_actions=num_actions,
             response_dicts=response_dicts,
         )
-        sampled_strategy = domain[np.argmax(prob_eq_vals)][None, :]
+        sampled_strategy = domain[np.argmax(prob_eq_vals)]
 
         # Report NE computed using predictive mean
         mean_funcs = create_mean_funcs(models=models)
