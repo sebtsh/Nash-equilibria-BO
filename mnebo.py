@@ -26,7 +26,7 @@ def rand():
     agent_dims = [1, 1]  # this determines num_agents and dims
     ls = np.array([0.5] * sum(agent_dims))
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
-    num_actions = 16
+    num_actions = 8
     noise_variance = 0.001
     num_init_points = 5
     num_iters = 200
@@ -41,7 +41,7 @@ def gan():
     agent_dims = [2, 3]  # this determines num_agents and dims
     ls = np.array([0.5, 0.5, 2.0, 2.0, 2.0])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
-    num_actions = 32
+    num_actions = 8
     noise_variance = 0.001
     num_init_points = 5
     num_iters = 400
@@ -56,7 +56,7 @@ def bcad():
     agent_dims = [3, 2]  # this determines num_agents and dims
     ls = np.array([1.5, 0.5, 1.0, 0.5, 0.5])
     bound = [-1.0, 1.0]  # assumes same bounds for all dims
-    num_actions = 32
+    num_actions = 16
     noise_variance = 0.001
     num_init_points = 5
     num_iters = 400
@@ -109,19 +109,19 @@ def main(
     )
     U1 = np.reshape(u[0](domain), (num_actions, num_actions))
     U2 = np.reshape(u[1](domain), (num_actions, num_actions))
-    # print("U1:")
-    # print(U1)
-    # print("U2:")
-    # print(U2)
-    #
-    # all_res, _ = SEM(U1, U2, "all")
-    # for res in all_res:
-    #     s1 = res[:num_actions]
-    #     s2 = res[num_actions + 1 : num_actions + num_actions + 1]
-    #     print(f"Agent 1 strategy: {s1}, with value {res[num_actions]}")
-    #     print(f"Agent 2 strategy: {s2}, with value {res[num_actions + num_actions + 1]}")
-    #     print(f"-brp: {neg_brp_mixed(U1, U2, (s1, s2))}")
-    #     print("==============")
+    print("U1:")
+    print(U1)
+    print("U2:")
+    print(U2)
+
+    all_res, _ = SEM(U1, U2, "first", prev_successes=[])
+    for res in all_res:
+        s1 = res[:num_actions]
+        s2 = res[num_actions + 1 : num_actions + num_actions + 1]
+        print(f"Agent 1 strategy: {s1}, with value {res[num_actions]}")
+        print(f"Agent 2 strategy: {s2}, with value {res[num_actions + num_actions + 1]}")
+        print(f"-brp: {neg_brp_mixed(U1, U2, (s1, s2))}")
+        print("==============")
 
     observer = noisy_observer(u=u, noise_variance=noise_variance, rng=rng)
     init_idxs = rng.integers(

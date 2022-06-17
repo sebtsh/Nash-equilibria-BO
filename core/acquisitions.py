@@ -780,17 +780,15 @@ def ucb_mne_noexplore(beta, domain, M):
 
         noreg_samples_coords = cross_product(a1supp[:, None], a2supp[:, None])
         # Take the noreg sample with the highest uncertainty
-        final_idxs = []
         noreg_idxs = noreg_samples_coords[:, 0] * M + noreg_samples_coords[:, 1]  # (c,)
         noreg_ci_vals = ucb_funcs[0](domain[noreg_idxs]) - lcb_funcs[0](
             domain[noreg_idxs]
         )  # (c, 1)
         noreg_final_idx = noreg_idxs[np.argmax(noreg_ci_vals[:, 0])]
-        final_idxs.append(noreg_final_idx)
 
-        samples = domain[np.array(final_idxs)]
+        sampled_pure_strategy = domain[noreg_final_idx]
 
-        return samples, (s1, s2), prev_successes
+        return (s1, s2), sampled_pure_strategy, prev_successes
 
     return acq
 
@@ -824,8 +822,8 @@ def max_ent_mne(beta, domain, M):
             models[0].posterior().predict_f(domain)
         )  # use first one because all models have same pred var
         max_ent_idx = np.argmax(np.squeeze(var, axis=-1))
-        samples = domain[max_ent_idx : max_ent_idx + 1]
+        sampled_pure_strategy = domain[max_ent_idx]
 
-        return samples, (s1, s2), prev_successes
+        return (s1, s2), sampled_pure_strategy, prev_successes
 
     return acq
