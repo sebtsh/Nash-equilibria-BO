@@ -6,7 +6,7 @@ import matplotlib
 from core.objectives import get_utilities, noisy_observer
 from core.utils import get_agent_dims_bounds, discretize_domain
 from core.optimization import bo_loop_mne
-from core.acquisitions import get_acq_mixed
+from core.mixed_acquisitions import get_acq_mixed
 from core.mne import SEM, neg_brp_mixed
 from metrics.regret import calc_regret_mne
 from metrics.plotting import plot_regret
@@ -119,7 +119,9 @@ def main(
         s1 = res[:num_actions]
         s2 = res[num_actions + 1 : num_actions + num_actions + 1]
         print(f"Agent 1 strategy: {s1}, with value {res[num_actions]}")
-        print(f"Agent 2 strategy: {s2}, with value {res[num_actions + num_actions + 1]}")
+        print(
+            f"Agent 2 strategy: {s2}, with value {res[num_actions + num_actions + 1]}"
+        )
         print(f"-brp: {neg_brp_mixed(U1, U2, (s1, s2))}")
         print("==============")
 

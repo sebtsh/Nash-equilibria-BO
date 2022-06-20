@@ -5,7 +5,7 @@ import matplotlib
 import pickle
 from core.objectives import get_utilities, noisy_observer
 from core.optimization import bo_loop_pne
-from core.acquisitions import get_acq_pure
+from core.pure_acquisitions import get_acq_pure
 from core.utils import (
     get_agent_dims_bounds,
     discretize_domain,
