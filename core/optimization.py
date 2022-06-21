@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 from tqdm import trange
 from core.utils import merge_data
 from core.models import create_models
@@ -15,6 +16,7 @@ def bo_loop_pne(
     noise_variance,
     rng,
     args_dict,
+    save_path,
 ):
     """
     Main Bayesian optimization loop for PNEs.
@@ -27,13 +29,14 @@ def bo_loop_pne(
     :param noise_variance:
     :param rng:
     :param args_dict:
+    :param save_path:
     :return:
     """
     data = init_data
     reported_strategies = []
     sampled_strategies = []
     start = process_time()
-    for _ in trange(num_iters):
+    for t in trange(num_iters):
         models = create_models(
             num_agents=num_agents,
             data=data,
@@ -47,6 +50,17 @@ def bo_loop_pne(
         data = merge_data(data, (sampled_strategy[None, :], y_new))
         reported_strategies.append(reported_strategy)
         sampled_strategies.append(sampled_strategy)
+
+        if t != 0 and t % 50 == 0:
+            # Save state
+            pickle.dump(
+                (
+                    np.array(reported_strategies),
+                    np.array(sampled_strategies),
+                ),
+                open(save_path + f"-iter{t}.p", "wb"),
+            )
+
     end = process_time()
     total_time = end - start
     reported_strategies = np.array(reported_strategies)

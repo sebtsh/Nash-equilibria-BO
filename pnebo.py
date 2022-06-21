@@ -41,6 +41,7 @@ def rand():
     known_best_val = None
     num_actions_discrete = 16
     inner_max_mode = "sample_n_shrink"
+    plot_utils = False
 
 
 @ex.named_config
@@ -59,6 +60,7 @@ def gan():
     known_best_val = 0.0
     num_actions_discrete = 32
     inner_max_mode = "sample_n_shrink"
+    plot_utils = False
 
 
 @ex.named_config
@@ -77,6 +79,7 @@ def bcad():
     known_best_val = 0.0
     num_actions_discrete = 32
     inner_max_mode = "sample_n_shrink"
+    plot_utils = False
 
 
 @ex.automain
@@ -95,6 +98,7 @@ def main(
     known_best_val,
     num_actions_discrete,
     inner_max_mode,
+    plot_utils,
 ):
     args = dict(sorted(locals().items()))
     print(f"Running with parameters {args}")
@@ -108,6 +112,8 @@ def main(
     rng = np.random.default_rng(seed)
     tf.random.set_seed(seed)
     base_dir = "results/pne/" + utility_name + "/"
+    pickles_save_dir = base_dir + "pickles/"
+    Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     filename = f"pne-{utility_name}-{acq_name}-seed{seed}"
 
     kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
@@ -174,6 +180,7 @@ def main(
         noise_variance=noise_variance,
         rng=rng,
         args_dict=args_dict,
+        save_path=pickles_save_dir + filename,
     )
 
     time_per_iter = total_time / num_iters
@@ -242,7 +249,7 @@ def main(
     print(sampled_sample_regret)
     print(sampled_cumu_regret)
 
-    if dims == 2:
+    if dims == 2 and plot_utils:
         known_best_point, _ = _, best_val = maxmin_fn(
             outer_funcs=u,
             inner_funcs=u,
@@ -265,8 +272,6 @@ def main(
             known_best_point=known_best_point[None, :],
         )
 
-    pickles_save_dir = base_dir + "pickles/"
-    Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
     pickle.dump(
         (
             reported_strategies,
