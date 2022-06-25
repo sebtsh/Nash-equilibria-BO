@@ -19,14 +19,14 @@ def rand():
 @ex.named_config
 def gan():
     utility_name = "gan"
-    num_bo_iters = 400
+    num_bo_iters = 600
     num_seeds = 5
 
 
 @ex.named_config
 def bcad():
     utility_name = "bcad"
-    num_bo_iters = 400
+    num_bo_iters = 600
     num_seeds = 5
 
 
@@ -44,7 +44,8 @@ def main(
     save_dir = base_dir
     pickles_dir = base_dir + "pickles/"
 
-    acquisitions = ["ucb_pne", "prob_eq", "BN"]
+    #acquisitions = ["ucb_pne", "prob_eq", "BN"]
+    acquisitions = ["ucb_pne"]
     x = np.arange(num_bo_iters)
     color_dict = {
         "prob_eq": "#d7263d",

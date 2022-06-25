@@ -51,7 +51,7 @@ def bo_loop_pne(
         reported_strategies.append(reported_strategy)
         sampled_strategies.append(sampled_strategy)
 
-        if t != 0 and t % 50 == 0:
+        if t % 50 == 0:
             # Save state
             pickle.dump(
                 (
