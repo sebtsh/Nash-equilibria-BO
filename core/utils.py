@@ -394,7 +394,7 @@ def discretize_domain(num_agents, num_actions, bounds, agent_dims, rng, mode):
         domain = rng.uniform(
             low=bounds[start_dim:end_dim, 0],
             high=bounds[start_dim:end_dim, 1],
-            shape=(num_actions, end_dim - start_dim),
+            size=(num_actions, end_dim - start_dim),
         )
         for i in range(1, num_agents):
             start_dim, end_dim = agent_dims_bounds[i]
@@ -403,7 +403,7 @@ def discretize_domain(num_agents, num_actions, bounds, agent_dims, rng, mode):
                 rng.uniform(
                     low=bounds[start_dim:end_dim, 0],
                     high=bounds[start_dim:end_dim, 1],
-                    shape=(num_actions, end_dim - start_dim),
+                    size=(num_actions, end_dim - start_dim),
                 ),
             )
     else:
