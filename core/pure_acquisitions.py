@@ -20,9 +20,9 @@ def get_acq_pure(
     agent_dims_bounds,
     mode,
     n_samples_outer,
-    response_dicts=None,
+    inner_max_mode,
     num_actions=None,
-    inner_max_mode=None,
+    agent_dims=None,
 ):
     if acq_name == "ucb_pne":
         return ucb_pne(
@@ -34,16 +34,16 @@ def get_acq_pure(
             inner_max_mode=inner_max_mode,
         )
     elif acq_name == "prob_eq":
-        if response_dicts is None or num_actions is None:
+        if num_actions is None or agent_dims is None:
             raise Exception("None params passed to prob_eq")
         return prob_eq(
-            response_dicts=response_dicts,
             num_actions=num_actions,
             bounds=bounds,
             agent_dims_bounds=agent_dims_bounds,
             mode=mode,
             n_samples_outer=n_samples_outer,
             inner_max_mode=inner_max_mode,
+            agent_dims=agent_dims
         )
     elif acq_name == "BN":
         return BN(

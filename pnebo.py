@@ -138,8 +138,9 @@ def main(
         agent_dims_bounds=agent_dims_bounds,
         mode=maxmin_mode,
         n_samples_outer=n_samples_outer,
-        num_actions=num_actions_discrete,
         inner_max_mode=inner_max_mode,
+        num_actions=num_actions_discrete,
+        agent_dims=agent_dims
     )
 
     reported_strategies, sampled_strategies, total_time = bo_loop_pne(
