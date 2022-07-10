@@ -44,8 +44,7 @@ def main(
     save_dir = base_dir
     pickles_dir = base_dir + "pickles/"
 
-    #acquisitions = ["ucb_pne", "prob_eq", "BN"]
-    acquisitions = ["ucb_pne"]
+    acquisitions = ["ucb_pne", "prob_eq", "BN"]
     x = np.arange(num_bo_iters)
     color_dict = {
         "prob_eq": "#d7263d",

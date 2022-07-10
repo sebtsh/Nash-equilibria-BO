@@ -131,31 +131,6 @@ def main(
     )
     init_data = (init_X, observer(init_X))
 
-    if (
-        acq_name == "prob_eq" or acq_name == "SUR"
-    ):  # Do these steps for discrete acquisitions
-        # Discretize the domain
-        domain = discretize_domain(
-            num_agents=num_agents,
-            num_actions=num_actions_discrete,
-            bounds=bounds,
-            agent_dims=agent_dims,
-        )
-        domain.flags.writeable = False
-        # Create response_dicts
-        print("Creating response dicts")
-        action_idxs = np.arange(num_actions_discrete)
-        domain_in_idxs = action_idxs[:, None]
-        for i in range(1, num_agents):
-            domain_in_idxs = cross_product(domain_in_idxs, action_idxs[:, None])
-        response_dicts = [
-            create_response_dict(i, domain, domain_in_idxs, action_idxs)
-            for i in range(len(agent_dims))
-        ]
-    else:
-        domain = None
-        response_dicts = None
-
     acq_func, args_dict = get_acq_pure(
         acq_name=acq_name,
         beta=beta,
@@ -163,9 +138,6 @@ def main(
         agent_dims_bounds=agent_dims_bounds,
         mode=maxmin_mode,
         n_samples_outer=n_samples_outer,
-        noise_variance=noise_variance,
-        domain=domain,
-        response_dicts=response_dicts,
         num_actions=num_actions_discrete,
         inner_max_mode=inner_max_mode,
     )

@@ -375,16 +375,42 @@ def sobol_sequence(num_points, bounds):
     return sample * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]
 
 
-def discretize_domain(num_agents, num_actions, bounds, agent_dims):
+def discretize_domain(num_agents, num_actions, bounds, agent_dims, rng, mode):
     agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
     start_dim, end_dim = agent_dims_bounds[0]
-    domain = sobol_sequence(num_points=num_actions, bounds=bounds[start_dim:end_dim])
-    for i in range(1, num_agents):
-        start_dim, end_dim = agent_dims_bounds[i]
-        domain = cross_product(
-            domain,
-            sobol_sequence(num_points=num_actions, bounds=bounds[start_dim:end_dim]),
+    if mode == "sobol":
+        domain = sobol_sequence(
+            num_points=num_actions, bounds=bounds[start_dim:end_dim]
         )
+        for i in range(1, num_agents):
+            start_dim, end_dim = agent_dims_bounds[i]
+            domain = cross_product(
+                domain,
+                sobol_sequence(
+                    num_points=num_actions, bounds=bounds[start_dim:end_dim]
+                ),
+            )
+    elif mode == "random":
+        domain = rng.uniform(
+            low=bounds[start_dim:end_dim, 0],
+            high=bounds[start_dim:end_dim, 1],
+            shape=(num_actions, end_dim - start_dim),
+        )
+        for i in range(1, num_agents):
+            start_dim, end_dim = agent_dims_bounds[i]
+            domain = cross_product(
+                domain,
+                rng.uniform(
+                    low=bounds[start_dim:end_dim, 0],
+                    high=bounds[start_dim:end_dim, 1],
+                    shape=(num_actions, end_dim - start_dim),
+                ),
+            )
+    else:
+        raise Exception('incorrect mode passed')
+    assert len(domain) == num_actions**2
+    assert domain.shape[-1] == np.sum(agent_dims)
+
     return domain
 
 

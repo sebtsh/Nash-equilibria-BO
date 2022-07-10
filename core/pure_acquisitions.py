@@ -3,7 +3,13 @@ from scipy.stats import norm
 from statsmodels.sandbox.distributions.extras import mvnormcdf
 
 from core.pne import find_PNE_discrete
-from core.utils import maximize_fn, maxmin_fn
+from core.utils import (
+    maximize_fn,
+    maxmin_fn,
+    discretize_domain,
+    cross_product,
+    create_response_dict,
+)
 from core.models import create_ci_funcs, create_mean_funcs
 
 
@@ -14,8 +20,6 @@ def get_acq_pure(
     agent_dims_bounds,
     mode,
     n_samples_outer,
-    noise_variance,
-    domain=None,
     response_dicts=None,
     num_actions=None,
     inner_max_mode=None,
@@ -30,10 +34,9 @@ def get_acq_pure(
             inner_max_mode=inner_max_mode,
         )
     elif acq_name == "prob_eq":
-        if domain is None or response_dicts is None or num_actions is None:
+        if response_dicts is None or num_actions is None:
             raise Exception("None params passed to prob_eq")
         return prob_eq(
-            domain=domain,
             response_dicts=response_dicts,
             num_actions=num_actions,
             bounds=bounds,
@@ -41,15 +44,6 @@ def get_acq_pure(
             mode=mode,
             n_samples_outer=n_samples_outer,
             inner_max_mode=inner_max_mode,
-        )
-    elif acq_name == "SUR":
-        if domain is None or response_dicts is None or num_actions is None:
-            raise Exception("None params passed to SUR")
-        return SUR(
-            domain=domain,
-            response_dicts=response_dicts,
-            num_actions=num_actions,
-            noise_variance=noise_variance,
         )
     elif acq_name == "BN":
         return BN(
@@ -331,28 +325,46 @@ def compute_prob_eq_vals(X_idxs, models, domain, num_actions, response_dicts):
 
 
 def prob_eq(
-    domain,
-    response_dicts,
     num_actions,
     bounds,
     agent_dims_bounds,
     mode,
     n_samples_outer,
     inner_max_mode,
+    agent_dims,
 ):
     """
     Probability of Equilibrium acquisition from Picheny et. al. (2018). Requires a discretization of the continuous
     domain, and calculated response dicts.
-    :param domain: Array of shape (n, dims).
     :param response_dicts: list of N dicts. Each is a dictionary with keys that are the bytes of a length dims array,
     and returns the idxs of domain that have the actions of all other agents except i the same.
     :param num_actions: int. WARNING: assumes all agents have the same num_actions.
     :return: Array of shape (n,). The probability of equilibrium for each point in domain.
     """
-    num_agents = len(response_dicts)
-    assert num_actions**num_agents == len(domain)
+    num_agents = len(agent_dims)
 
     def acq(models, rng, args_dict):
+        # Sample new discrete domain
+        domain = discretize_domain(
+            num_agents=num_agents,
+            num_actions=num_actions,
+            bounds=bounds,
+            agent_dims=agent_dims,
+            rng=rng,
+            mode="random",
+        )
+        domain.flags.writeable = False
+        # Create response_dicts
+        print("Creating response dicts")
+        action_idxs = np.arange(num_actions)
+        domain_in_idxs = action_idxs[:, None]
+        for i in range(1, num_agents):
+            domain_in_idxs = cross_product(domain_in_idxs, action_idxs[:, None])
+        response_dicts = [
+            create_response_dict(i, domain, domain_in_idxs, action_idxs)
+            for i in range(num_agents)
+        ]
+
         prob_eq_vals = compute_prob_eq_vals(
             X_idxs=np.arange(len(domain)),
             models=models,
