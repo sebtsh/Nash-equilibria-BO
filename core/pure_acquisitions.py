@@ -33,6 +33,15 @@ def get_acq_pure(
             n_samples_outer=n_samples_outer,
             inner_max_mode=inner_max_mode,
         )
+    elif acq_name == "ucb_pne_noexplore":
+        return ucb_pne_noexplore(
+            beta=beta,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=mode,
+            n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode,
+        )
     elif acq_name == "prob_eq":
         if num_actions is None or agent_dims is None:
             raise Exception("None params passed to prob_eq")
@@ -134,6 +143,36 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mo
         _, variances = models[0].posterior().predict_f(strategies)  # (2, 1)
         sampled_strategy = strategies[np.argmax(np.squeeze(variances))]
         reported_strategy = noreg_sample
+
+        return reported_strategy, sampled_strategy, args_dict
+
+    return acq, {}
+
+
+def ucb_pne_noexplore(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mode):
+    def acq(models, rng, args_dict):
+        """
+        Returns 2 points to query next. First one is no-regret selection, second is exploring sample.
+        :param models: List of N GPflow GPs.
+        :param rng:
+        :param args_dict:
+        :return: array of shape (2, N).
+        """
+        N = len(agent_dims_bounds)
+        ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
+        # Pick no-regret selection
+        noreg_sample, _ = maxmin_fn(
+            outer_funcs=ucb_funcs,
+            inner_funcs=lcb_funcs,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=mode,
+            rng=rng,
+            n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode,
+        )
+        reported_strategy = noreg_sample
+        sampled_strategy = noreg_sample.copy()
 
         return reported_strategy, sampled_strategy, args_dict
 

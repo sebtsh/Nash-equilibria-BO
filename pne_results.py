@@ -13,7 +13,7 @@ ex.observers.append(FileStorageObserver("../runs"))
 def rand():
     utility_name = "rand"
     num_bo_iters = 200
-    num_seeds = 5
+    num_seeds = 4
 
 
 @ex.named_config
