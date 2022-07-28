@@ -162,7 +162,6 @@ def main(
                 print("Sanity check failed")
                 print(f"Previously computed regrets: {reported_sample_regret[:5]}")
                 print(f"Newly computed regrets: {reported_sample_regret2}")
-                raise Exception
 
             print("Computing regret for sampled strategies")
             sampled_sample_regret, sampled_cumu_regret = calc_regret_pne(
