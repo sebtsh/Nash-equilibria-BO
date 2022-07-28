@@ -108,8 +108,6 @@ def main(
         base_dir = "results/pne/" + utility_name + "/"
         pickles_save_dir = base_dir + "pickles/"
         Path(pickles_save_dir).mkdir(parents=True, exist_ok=True)
-        filename = f"pne-{utility_name}-{acq_name}-seed{seed}"
-
         kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
         u, _ = get_utilities(
             utility_name=utility_name,
