@@ -103,6 +103,7 @@ def main(
     agent_dims_bounds = get_agent_dims_bounds(agent_dims=agent_dims)
 
     for seed in range(5):
+        print(f"Seed {seed}")
         rng = np.random.default_rng(seed)
         tf.random.set_seed(seed)
         base_dir = "results/pne/" + utility_name + "/"
@@ -121,7 +122,19 @@ def main(
         save_dir = base_dir
         pickles_dir = base_dir + "pickles/"
 
+        if utility_name == "rand":
+            _, known_best_val = maxmin_fn(
+                outer_funcs=u,
+                inner_funcs=u,
+                bounds=bounds,
+                agent_dims_bounds=agent_dims_bounds,
+                mode=maxmin_mode,
+                rng=rng,
+                n_samples_outer=200,
+            )
+
         for acquisition in ["ucb_pne", "prob_eq", "BN"]:
+            print(f"acquisition {acquisition}")
             filename = f"pne-{utility_name}-{acquisition}-seed{seed}.p"
             (
                 reported_strategies,
