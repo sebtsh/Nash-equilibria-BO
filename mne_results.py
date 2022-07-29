@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
+from metrics.plotting import smooth_curve
 
 ex = Experiment("NashBO_results")
 ex.observers.append(FileStorageObserver("../runs"))
@@ -51,7 +52,7 @@ def main(
         "ucb_mne": "#00a6ed",
     }
     acq_name_dict = {
-        "ucb_mne_noexplore": "UCB-MNE non-exploring",
+        "ucb_mne_noexplore": "UCB-MNE no-exp",
         "max_ent_mne": "Max entropy",
         "ucb_mne": "UCB-MNE",
     }
@@ -93,12 +94,11 @@ def main(
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Cumu. mixed Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend()
+        axs.legend(fontsize=text_size-2, loc='lower left')
 
     fig.tight_layout()
     fig.savefig(
         save_dir + f"mne-{utility_name}-cumu_regret.pdf",
-        figsize=figsize,
         dpi=dpi,
         bbox_inches="tight",
         format="pdf",
@@ -129,12 +129,21 @@ def main(
         std_err_imm_regrets = np.std(all_imm_regrets, axis=0) / np.sqrt(num_seeds)
         acq_name = acq_name_dict[acquisition]
 
-        # Cumulative regret
-        axs.plot(x, mean_imm_regrets, label=acq_name, color=color)
+        # # Immediate regret
+        # axs.plot(x, mean_imm_regrets, label=acq_name, color=color)
+        # axs.fill_between(
+        #     x,
+        #     mean_imm_regrets - std_err_imm_regrets,
+        #     mean_imm_regrets + std_err_imm_regrets,
+        #     alpha=0.2,
+        #     color=color,
+        # )
+        # Immediate regret
+        axs.plot(x, smooth_curve(mean_imm_regrets), label=acq_name, color=color)
         axs.fill_between(
             x,
-            mean_imm_regrets - std_err_imm_regrets,
-            mean_imm_regrets + std_err_imm_regrets,
+            smooth_curve(mean_imm_regrets) - smooth_curve(std_err_imm_regrets),
+            smooth_curve(mean_imm_regrets) + smooth_curve(std_err_imm_regrets),
             alpha=0.2,
             color=color,
         )
@@ -142,12 +151,11 @@ def main(
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Imm. mixed Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend()
+        axs.legend(fontsize=text_size-2, loc='lower left')
 
     fig.tight_layout()
     fig.savefig(
-        save_dir + f"mne-{utility_name}-imm_regret.pdf",
-        figsize=figsize,
+        save_dir + f"mne-{utility_name}-imm_regret-smoothed.pdf",
         dpi=dpi,
         bbox_inches="tight",
         format="pdf",

@@ -453,3 +453,17 @@ def plot_imm_regret(
         plt.savefig(save_dir + filename, bbox_inches="tight")
     if show_plot:
         plt.show()
+
+
+def smooth_curve(regret):
+    new_regret = np.zeros(len(regret))
+    for i in range(len(regret) - 1):
+        if i % 2 == 0:
+            new_regret[i] = (regret[i] + regret[i+1]) / 2
+        else:
+            new_regret[i] = (regret[i-1] + regret[i]) / 2
+    if len(regret) % 2 == 0:
+        new_regret[-1] = (regret[-2] + regret[-1]) / 2
+    else:
+        new_regret[-1] = regret[-1]
+    return new_regret

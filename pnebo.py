@@ -251,6 +251,8 @@ def main(
             sampled_strategies,
             reported_sample_regret,
             reported_cumu_regret,
+            sampled_sample_regret,
+            sampled_cumu_regret,
             time_per_iter,
             args,
         ),

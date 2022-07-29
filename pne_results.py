@@ -52,7 +52,7 @@ def main(
         "ucb_pne": "#00a6ed",
     }
     acq_name_dict = {
-        "prob_eq": "Probability of Equilibrium",
+        "prob_eq": "Prob. Equil.",
         "BN": "BN",
         "ucb_pne": "UCB-PNE",
     }
@@ -65,12 +65,14 @@ def main(
         all_cumu_regrets = np.zeros((num_seeds, num_bo_iters))
         all_times = []
         for seed in range(num_seeds):
-            filename = f"pne-{utility_name}-{acquisition}-seed{seed}.p"
+            filename = f"pne-{utility_name}-{acquisition}-seed{seed}-2.p"
             (
                 reported_strategies,
                 sampled_strategies,
                 reported_sample_regret,
                 reported_cumu_regret,
+                sampled_sample_regret,
+                sampled_cumu_regret,
                 time_per_iter,
                 args,
             ) = pickle.load(open(pickles_dir + filename, "rb"))
@@ -94,12 +96,11 @@ def main(
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Cumu. pure Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend()
+        axs.legend(fontsize=text_size-2, loc='lower left')
 
     fig.tight_layout()
     fig.savefig(
         save_dir + f"pne-{utility_name}-cumu_regret.pdf",
-        figsize=figsize,
         dpi=dpi,
         bbox_inches="tight",
         format="pdf",
@@ -114,12 +115,14 @@ def main(
         all_imm_regrets = np.zeros((num_seeds, num_bo_iters))
         all_times = []
         for seed in range(num_seeds):
-            filename = f"pne-{utility_name}-{acquisition}-seed{seed}.p"
+            filename = f"pne-{utility_name}-{acquisition}-seed{seed}-2.p"
             (
                 reported_strategies,
                 sampled_strategies,
                 reported_sample_regret,
                 reported_cumu_regret,
+                sampled_sample_regret,
+                sampled_cumu_regret,
                 time_per_iter,
                 args,
             ) = pickle.load(open(pickles_dir + filename, "rb"))
@@ -143,12 +146,61 @@ def main(
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Imm. pure Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend()
+        axs.legend(fontsize=text_size-2, loc='lower left')
 
     fig.tight_layout()
     fig.savefig(
         save_dir + f"pne-{utility_name}-imm_regret.pdf",
-        figsize=figsize,
+        dpi=dpi,
+        bbox_inches="tight",
+        format="pdf",
+    )
+
+    # Plot sample regret
+    fig, axs = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
+    axs.set_yscale("log")
+
+    for acquisition in acquisitions:
+        color = color_dict[acquisition]
+        all_sample_regrets = np.zeros((num_seeds, num_bo_iters))
+        all_times = []
+        for seed in range(num_seeds):
+            filename = f"pne-{utility_name}-{acquisition}-seed{seed}-2.p"
+            (
+                reported_strategies,
+                sampled_strategies,
+                reported_sample_regret,
+                reported_cumu_regret,
+                sampled_sample_regret,
+                sampled_cumu_regret,
+                time_per_iter,
+                args,
+            ) = pickle.load(open(pickles_dir + filename, "rb"))
+
+            all_sample_regrets[seed] = sampled_sample_regret
+            all_times.append(time_per_iter)
+        mean_sample_regrets = np.mean(all_sample_regrets, axis=0)
+        std_err_sample_regrets = np.std(all_sample_regrets, axis=0) / np.sqrt(num_seeds)
+        acq_name = acq_name_dict[acquisition]
+
+        # Cumulative regret
+        axs.plot(x, mean_sample_regrets, label=acq_name, color=color)
+        axs.fill_between(
+            x,
+            mean_sample_regrets - std_err_sample_regrets,
+            mean_sample_regrets + std_err_sample_regrets,
+            alpha=0.2,
+            color=color,
+        )
+        # axs[i].legend(fontsize=20)
+        axs.set_xlabel("Iterations", size=text_size)
+        axs.set_ylabel("Sample pure Nash regret", size=text_size)
+        axs.tick_params(labelsize=tick_size)
+        axs.legend(fontsize=text_size-2, loc='lower left')
+
+    fig.tight_layout()
+    fig.savefig(
+        save_dir + f"pne-{utility_name}-sample_regret.pdf",
         dpi=dpi,
         bbox_inches="tight",
         format="pdf",
