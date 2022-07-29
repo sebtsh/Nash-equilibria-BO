@@ -94,7 +94,7 @@ def main(
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Cumu. mixed Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend(fontsize=text_size-2, loc='lower left')
+        axs.legend(fontsize=text_size - 2, loc="lower left")
 
     fig.tight_layout()
     fig.savefig(
@@ -151,7 +151,7 @@ def main(
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Imm. mixed Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend(fontsize=text_size-2, loc='lower left')
+        axs.legend(fontsize=text_size - 2, loc="lower left")
 
     fig.tight_layout()
     fig.savefig(

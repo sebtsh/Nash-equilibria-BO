@@ -371,7 +371,7 @@ def lengthscale_test(f, bounds, num_samples=1000):
 def sobol_sequence(num_points, bounds):
     sampler = qmc.Sobol(d=len(bounds), scramble=False)
     m = int(np.log2(num_points))
-    if 2 ** m == num_points:
+    if 2**m == num_points:
         sample = sampler.random_base2(m=m)  # (2 ** m, d) points in [0, 1)
     else:
         sample = sampler.random(num_points)
@@ -410,7 +410,7 @@ def discretize_domain(num_agents, num_actions, bounds, agent_dims, rng, mode):
                 ),
             )
     else:
-        raise Exception('incorrect mode passed')
+        raise Exception("incorrect mode passed")
     assert len(domain) == num_actions**2
     assert domain.shape[-1] == np.sum(agent_dims)
 

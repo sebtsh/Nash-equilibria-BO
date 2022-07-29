@@ -52,7 +52,7 @@ def get_acq_pure(
             mode=mode,
             n_samples_outer=n_samples_outer,
             inner_max_mode=inner_max_mode,
-            agent_dims=agent_dims
+            agent_dims=agent_dims,
         )
     elif acq_name == "BN":
         return BN(
@@ -149,7 +149,9 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mo
     return acq, {}
 
 
-def ucb_pne_noexplore(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mode):
+def ucb_pne_noexplore(
+    beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mode
+):
     def acq(models, rng, args_dict):
         """
         Returns 2 points to query next. First one is no-regret selection, second is exploring sample.

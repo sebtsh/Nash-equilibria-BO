@@ -8,9 +8,6 @@ from core.optimization import bo_loop_pne
 from core.pure_acquisitions import get_acq_pure
 from core.utils import (
     get_agent_dims_bounds,
-    discretize_domain,
-    cross_product,
-    create_response_dict,
     get_maxmin_mode,
     maxmin_fn,
 )
@@ -140,7 +137,7 @@ def main(
         n_samples_outer=n_samples_outer,
         inner_max_mode=inner_max_mode,
         num_actions=num_actions_discrete,
-        agent_dims=agent_dims
+        agent_dims=agent_dims,
     )
 
     reported_strategies, sampled_strategies, total_time = bo_loop_pne(

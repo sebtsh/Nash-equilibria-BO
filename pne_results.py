@@ -1,7 +1,7 @@
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
+from metrics.plotting import smooth_curve
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 
@@ -96,7 +96,7 @@ def main(
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Cumu. pure Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend(fontsize=text_size-2, loc='lower left')
+        axs.legend(fontsize=text_size - 2, loc="lower left")
 
     fig.tight_layout()
     fig.savefig(
@@ -132,21 +132,31 @@ def main(
         mean_imm_regrets = np.mean(all_imm_regrets, axis=0)
         std_err_imm_regrets = np.std(all_imm_regrets, axis=0) / np.sqrt(num_seeds)
         acq_name = acq_name_dict[acquisition]
+        print(
+            f"{acquisition} all_times: {all_times}, mean time per iter: {np.mean(all_times)}"
+        )
 
-        # Cumulative regret
-        axs.plot(x, mean_imm_regrets, label=acq_name, color=color)
+        # Immediate regret
+        # axs.plot(x, mean_imm_regrets, label=acq_name, color=color)
+        # axs.fill_between(
+        #     x,
+        #     mean_imm_regrets - std_err_imm_regrets,
+        #     mean_imm_regrets + std_err_imm_regrets,
+        #     alpha=0.2,
+        #     color=color,
+        # )
+        axs.plot(x, smooth_curve(mean_imm_regrets), label=acq_name, color=color)
         axs.fill_between(
             x,
-            mean_imm_regrets - std_err_imm_regrets,
-            mean_imm_regrets + std_err_imm_regrets,
+            smooth_curve(mean_imm_regrets) - smooth_curve(std_err_imm_regrets),
+            smooth_curve(mean_imm_regrets) + smooth_curve(std_err_imm_regrets),
             alpha=0.2,
             color=color,
         )
-        # axs[i].legend(fontsize=20)
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Imm. pure Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend(fontsize=text_size-2, loc='lower left')
+        axs.legend(fontsize=text_size - 2, loc="lower left")
 
     fig.tight_layout()
     fig.savefig(
@@ -183,12 +193,12 @@ def main(
         std_err_sample_regrets = np.std(all_sample_regrets, axis=0) / np.sqrt(num_seeds)
         acq_name = acq_name_dict[acquisition]
 
-        # Cumulative regret
-        axs.plot(x, mean_sample_regrets, label=acq_name, color=color)
+        # Sample regret
+        axs.plot(x, smooth_curve(mean_sample_regrets), label=acq_name, color=color)
         axs.fill_between(
             x,
-            mean_sample_regrets - std_err_sample_regrets,
-            mean_sample_regrets + std_err_sample_regrets,
+            smooth_curve(mean_sample_regrets) - smooth_curve(std_err_sample_regrets),
+            smooth_curve(mean_sample_regrets) + smooth_curve(std_err_sample_regrets),
             alpha=0.2,
             color=color,
         )
@@ -196,7 +206,7 @@ def main(
         axs.set_xlabel("Iterations", size=text_size)
         axs.set_ylabel("Sample pure Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend(fontsize=text_size-2, loc='lower left')
+        axs.legend(fontsize=text_size - 2, loc="lower left")
 
     fig.tight_layout()
     fig.savefig(
