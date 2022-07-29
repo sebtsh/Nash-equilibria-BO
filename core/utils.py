@@ -371,7 +371,10 @@ def lengthscale_test(f, bounds, num_samples=1000):
 def sobol_sequence(num_points, bounds):
     sampler = qmc.Sobol(d=len(bounds), scramble=False)
     m = int(np.log2(num_points))
-    sample = sampler.random_base2(m=m)  # (2 ** m, d) points in [0, 1)
+    if 2 ** m == num_points:
+        sample = sampler.random_base2(m=m)  # (2 ** m, d) points in [0, 1)
+    else:
+        sample = sampler.random(num_points)
     return sample * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]
 
 
