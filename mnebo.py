@@ -96,6 +96,8 @@ def main(
         num_actions=num_actions,
         bounds=bounds,
         agent_dims=agent_dims,
+        rng=rng,
+        mode="sobol"
     )
 
     kernel = gpf.kernels.SquaredExponential(lengthscales=ls)
