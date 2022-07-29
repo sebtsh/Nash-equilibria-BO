@@ -293,21 +293,25 @@ def BN(
             )
 
         # Report NE computed using predictive mean
-        mean_funcs = create_mean_funcs(models=models)
-        reported_strategy, _ = maxmin_fn(
-            outer_funcs=mean_funcs,
-            inner_funcs=mean_funcs,
-            bounds=bounds,
-            agent_dims_bounds=agent_dims_bounds,
-            mode=mode,
-            rng=rng,
-            n_samples_outer=n_samples_outer,
-            inner_max_mode=inner_max_mode,
-        )
+        if args_dict["is_reporting"]:
+            mean_funcs = create_mean_funcs(models=models)
+            reported_strategy, _ = maxmin_fn(
+                outer_funcs=mean_funcs,
+                inner_funcs=mean_funcs,
+                bounds=bounds,
+                agent_dims_bounds=agent_dims_bounds,
+                mode=mode,
+                rng=rng,
+                n_samples_outer=n_samples_outer,
+                inner_max_mode=inner_max_mode,
+            )
+        else:
+            print("Not reporting")
+            reported_strategy = None
 
         return reported_strategy, sampled_strategy, args_dict
 
-    return acq, {}
+    return acq, {"is_reporting": True}
 
 
 def compute_prob_eq_vals(X_idxs, models, domain, num_actions, response_dicts):
@@ -415,22 +419,26 @@ def prob_eq(
         )
         sampled_strategy = domain[np.argmax(prob_eq_vals)]
 
-        # Report NE computed using predictive mean
-        mean_funcs = create_mean_funcs(models=models)
-        reported_strategy, _ = maxmin_fn(
-            outer_funcs=mean_funcs,
-            inner_funcs=mean_funcs,
-            bounds=bounds,
-            agent_dims_bounds=agent_dims_bounds,
-            mode=mode,
-            rng=rng,
-            n_samples_outer=n_samples_outer,
-            inner_max_mode=inner_max_mode,
-        )
+        if args_dict["is_reporting"]:
+            # Report NE computed using predictive mean
+            mean_funcs = create_mean_funcs(models=models)
+            reported_strategy, _ = maxmin_fn(
+                outer_funcs=mean_funcs,
+                inner_funcs=mean_funcs,
+                bounds=bounds,
+                agent_dims_bounds=agent_dims_bounds,
+                mode=mode,
+                rng=rng,
+                n_samples_outer=n_samples_outer,
+                inner_max_mode=inner_max_mode,
+            )
+        else:
+            print("Not reporting")
+            reported_strategy = None
 
         return reported_strategy, sampled_strategy, args_dict
 
-    return acq, {}
+    return acq, {"is_reporting": True}
 
 
 def compute_NE_matrix(fvals, domain, response_dicts):

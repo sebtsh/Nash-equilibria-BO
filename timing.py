@@ -142,7 +142,7 @@ def main(
             num_actions=num_discrete,
             agent_dims=agent_dims,
         )
-
+        args_dict["is_reporting"] = False
         models = create_models(
             num_agents=num_agents,
             data=init_data,
