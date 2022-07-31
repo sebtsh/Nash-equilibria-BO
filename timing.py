@@ -34,7 +34,7 @@ def rand():
     n_samples_outer = 50
     seed = 0
     known_best_val = None
-    num_actions_discrete = 16
+    num_actions_discrete = 64
     inner_max_mode = "sample_n_shrink"
     plot_utils = False
 
@@ -52,7 +52,7 @@ def gan():
     n_samples_outer = 50
     seed = 0
     known_best_val = 0.0
-    num_actions_discrete = 32
+    num_actions_discrete = 64
     inner_max_mode = "sample_n_shrink"
     plot_utils = False
 
@@ -70,7 +70,7 @@ def bcad():
     n_samples_outer = 50
     seed = 0
     known_best_val = 0.0
-    num_actions_discrete = 32
+    num_actions_discrete = 64
     inner_max_mode = "sample_n_shrink"
     plot_utils = False
 
