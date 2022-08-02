@@ -357,7 +357,7 @@ def compute_prob_eq_vals(X_idxs, models, domain, num_actions, response_dicts):
                             upper=np.zeros(num_actions - 1),
                             mu=mean_reduced,
                             cov=cov_reduced,
-                            maxpts=5000,
+                            maxpts=2000 * num_actions,
                             abseps=1,
                         )
                         probs[idx, i] = prob
