@@ -34,7 +34,7 @@ def rand():
     num_iters = 200
     beta = 2.0
     n_samples_outer = 50
-    seed = 0
+    seed = 4
     known_best_val = None
     num_actions_discrete = 32
     inner_max_mode = "sample_n_shrink"
@@ -253,7 +253,7 @@ def main(
             time_per_iter,
             args,
         ),
-        open(pickles_save_dir + f"{filename}.p", "wb"),
+        open(pickles_save_dir + f"{filename}-2.p", "wb"),
     )
 
     print(f"Completed run {run_id} with parameters {args}")
