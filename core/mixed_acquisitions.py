@@ -170,3 +170,36 @@ def max_ent_mne(beta, domain, M):
         return (s1, s2), sampled_pure_strategy, prev_successes
 
     return acq
+
+
+def random_mne(beta, domain, M):
+    """
+    Random sampling.
+    :param beta:
+    :param domain:
+    :param M:
+    :return:
+    """
+
+    def acq(models, prev_successes, rng):
+        ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
+        U1upper = np.reshape(ucb_funcs[0](domain), (M, M))
+        U1lower = np.reshape(lcb_funcs[0](domain), (M, M))
+        U2upper = np.reshape(ucb_funcs[1](domain), (M, M))
+        U2lower = np.reshape(lcb_funcs[1](domain), (M, M))
+
+        U1_sample = rng.uniform(low=U1lower, high=U1upper)
+        U2_sample = rng.uniform(low=U2lower, high=U2upper)
+
+        mne_list, prev_successes = SEM(
+            U1=U1_sample, U2=U2_sample, mode="first", prev_successes=prev_successes
+        )
+        mne = mne_list[0]
+        (s1, s2), _ = get_strategies_and_support(mne, M, M)
+
+        rand_idx = rng.integers(0, len(domain))
+        sampled_pure_strategy = domain[rand_idx]
+
+        return (s1, s2), sampled_pure_strategy, prev_successes
+
+    return acq
