@@ -12,6 +12,8 @@ def get_acq_mixed(acq_name, beta, domain, num_actions):
         return ucb_mne_noexplore(beta=beta, domain=domain, M=num_actions)
     elif acq_name == "max_ent_mne":
         return max_ent_mne(beta=beta, domain=domain, M=num_actions)
+    elif acq_name == "random_mne":
+        return random_mne(beta=beta, domain=domain, M=num_actions)
     else:
         raise Exception("Invalid acquisition name passed to get_acq_mixed")
 
