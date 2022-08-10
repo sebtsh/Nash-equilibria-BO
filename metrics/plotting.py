@@ -455,15 +455,23 @@ def plot_imm_regret(
         plt.show()
 
 
-def smooth_curve(regret):
-    new_regret = np.zeros(len(regret))
-    for i in range(len(regret) - 1):
-        if i % 2 == 0:
-            new_regret[i] = (regret[i] + regret[i + 1]) / 2
+def smooth_curve(regret, mode="SG"):
+    num_iters = len(regret)
+    if mode == "simple":
+        new_regret = np.zeros(num_iters)
+        for i in range(num_iters - 1):
+            if i % 2 == 0:
+                new_regret[i] = (regret[i] + regret[i + 1]) / 2
+            else:
+                new_regret[i] = (regret[i - 1] + regret[i]) / 2
+        if num_iters % 2 == 0:
+            new_regret[-1] = (regret[-2] + regret[-1]) / 2
         else:
-            new_regret[i] = (regret[i - 1] + regret[i]) / 2
-    if len(regret) % 2 == 0:
-        new_regret[-1] = (regret[-2] + regret[-1]) / 2
+            new_regret[-1] = regret[-1]
+    elif mode == "SG":
+        from scipy.signal import savgol_filter
+
+        new_regret = savgol_filter(regret, 11, 3)
     else:
-        new_regret[-1] = regret[-1]
+        raise Exception("Incorrect mode passed to smooth_curve")
     return new_regret

@@ -44,7 +44,7 @@ def main(
     save_dir = base_dir
     pickles_dir = base_dir + "pickles/"
 
-    acquisitions = ["ucb_pne", "prob_eq", "BN", "ucb_pne_noexplore"]
+    acquisitions = ["prob_eq", "BN", "ucb_pne_noexplore", "ucb_pne"]
     x = np.arange(num_bo_iters)
     color_dict = {
         "prob_eq": "#d7263d",
@@ -53,9 +53,9 @@ def main(
         "ucb_pne_noexplore": "#26c485",
     }
     acq_name_dict = {
-        "prob_eq": "Prob. Equil.",
+        "prob_eq": "PE",
         "BN": "BN",
-        "ucb_pne": "UCB-PNE",
+        "ucb_pne": "UCB-PNE (ours)",
         "ucb_pne_noexplore": "UCB-PNE no-exp",
     }
 

@@ -44,17 +44,19 @@ def main(
     save_dir = base_dir
     pickles_dir = base_dir + "pickles/"
 
-    acquisitions = ["ucb_mne", "ucb_mne_noexplore", "max_ent_mne"]
+    acquisitions = ["random_mne", "max_ent_mne", "ucb_mne_noexplore", "ucb_mne"]
     x = np.arange(num_bo_iters)
     color_dict = {
-        "ucb_mne_noexplore": "#d7263d",
+        "ucb_mne_noexplore": "#26c485",
         "max_ent_mne": "#fbb13c",
         "ucb_mne": "#00a6ed",
+        "random_mne": "#d7263d",
     }
     acq_name_dict = {
         "ucb_mne_noexplore": "UCB-MNE no-exp",
         "max_ent_mne": "Max entropy",
-        "ucb_mne": "UCB-MNE",
+        "ucb_mne": "UCB-MNE (ours)",
+        "random_mne": "Random",
     }
 
     # Plot cumulative regret

@@ -123,14 +123,10 @@ def main(
     init_data = (init_X, observer(init_X))
 
     time_dict = {}
-    for acq in ["ucb_pne", "prob_eq", "prob_eq2", "BN"]:
+    for acq in ["prob_eq", "BN", "ucb_pne", "ucb_pne_noexplore"]:
         print(f"Timing for {acq}")
-        if acq == "prob_eq2":
-            acq_name = "prob_eq"
-            num_discrete = num_actions_discrete * 2
-        else:
-            acq_name = acq
-            num_discrete = num_actions_discrete
+        acq_name = acq
+        num_discrete = num_actions_discrete
         acq_func, args_dict = get_acq_pure(
             acq_name=acq_name,
             beta=beta,
@@ -161,6 +157,42 @@ def main(
         print(f"Times for {utility_name}-{acq}: {times}")
         print(f"Mean time for {utility_name}-{acq}: {np.mean(times)}")
         time_dict[acq] = times
+
+    # With reporting
+    for acq in ["prob_eq", "BN"]:
+        print(f"Timing for {acq} with reporting")
+        acq_name = acq
+        num_discrete = num_actions_discrete
+        acq_func, args_dict = get_acq_pure(
+            acq_name=acq_name,
+            beta=beta,
+            bounds=bounds,
+            agent_dims_bounds=agent_dims_bounds,
+            mode=maxmin_mode,
+            n_samples_outer=n_samples_outer,
+            inner_max_mode=inner_max_mode,
+            num_actions=num_discrete,
+            agent_dims=agent_dims,
+        )
+        args_dict["is_reporting"] = True
+        models = create_models(
+            num_agents=num_agents,
+            data=init_data,
+            kernel=kernel,
+            noise_variance=noise_variance,
+        )
+        times = []
+
+        for i in range(5):
+            start = process_time()
+            reported_strategy, sampled_strategy, args_dict = acq_func(
+                models=models, rng=rng, args_dict=args_dict
+            )
+            end = process_time()
+            times.append(end - start)
+        print(f"Times for {utility_name}-{acq}-withreporting: {times}")
+        print(f"Mean time for {utility_name}-{acq}-withreporting: {np.mean(times)}")
+        time_dict[acq + "withreporting"] = times
 
     pickle.dump(
         time_dict,
