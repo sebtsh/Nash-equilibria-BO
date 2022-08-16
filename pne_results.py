@@ -211,7 +211,7 @@ def main(
         )
         # axs[i].legend(fontsize=20)
         axs.set_xlabel("Iterations", size=text_size)
-        axs.set_ylabel("Sample pure Nash regret", size=text_size)
+        axs.set_ylabel("Imm. pure Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
         axs.legend(fontsize=text_size - 2, loc="lower left")
 

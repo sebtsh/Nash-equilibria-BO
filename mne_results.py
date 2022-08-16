@@ -155,6 +155,10 @@ def main(
         axs.tick_params(labelsize=tick_size)
         axs.legend(fontsize=text_size - 2, loc="lower left")
 
+        print(
+            f"{acquisition} all_times: {all_times}, mean: {np.mean(all_times)}, stderr: {np.std(all_times) / np.sqrt(num_seeds)}"
+        )
+
     fig.tight_layout()
     fig.savefig(
         save_dir + f"mne-{utility_name}-imm_regret-smoothed.pdf",

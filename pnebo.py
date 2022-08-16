@@ -253,7 +253,7 @@ def main(
             time_per_iter,
             args,
         ),
-        open(pickles_save_dir + f"{filename}-2.p", "wb"),
+        open(pickles_save_dir + f"{filename}.p", "wb"),
     )
 
     print(f"Completed run {run_id} with parameters {args}")
