@@ -21,8 +21,8 @@ def get_acq_mixed(acq_name, beta, domain, num_actions):
 def ucb_mne(beta, domain, M):
     def acq(models, prev_successes, rng):
         """
-        Returns a pair of mixed strategies, and a batch of points to query next. One no-regret pure strategy, and one
-        exploring pure strategy.
+        Algorithm 2. Returns a pair of mixed strategies, the pure strategy to sample, and a list of previous successful
+        supports to speed up SEM.
         :param models: List of N GPflow GPs.
         :param prev_successes:
         :return:
@@ -33,9 +33,11 @@ def ucb_mne(beta, domain, M):
         U2upper = np.reshape(ucb_funcs[1](domain), (M, M))
         U2lower = np.reshape(lcb_funcs[1](domain), (M, M))
 
+        # Sample utility functions (line 3 in Algorithm 2)
         U1_sample = rng.uniform(low=U1lower, high=U1upper)
         U2_sample = rng.uniform(low=U2lower, high=U2upper)
 
+        # Report mixed strategy profile (line 4 in Algorithm 2)
         mne_list, prev_successes = SEM(
             U1=U1_sample, U2=U2_sample, mode="first", prev_successes=prev_successes
         )
@@ -43,7 +45,7 @@ def ucb_mne(beta, domain, M):
         (s1, s2), (a1supp, a2supp) = get_strategies_and_support(mne, M, M)
 
         noreg_samples_coords = cross_product(a1supp[:, None], a2supp[:, None])
-        # Take the noreg sample with the highest uncertainty
+        # Compute the exploiting pure strategy profile (Equation 14)
         final_idxs = []
         noreg_idxs = noreg_samples_coords[:, 0] * M + noreg_samples_coords[:, 1]  # (c,)
         noreg_ci_vals = ucb_funcs[0](domain[noreg_idxs]) - lcb_funcs[0](
@@ -52,7 +54,7 @@ def ucb_mne(beta, domain, M):
         noreg_final_idx = noreg_idxs[np.argmax(noreg_ci_vals[:, 0])]
         final_idxs.append(noreg_final_idx)
 
-        # Exploring samples
+        # Compute all exploring pure strategy profiles (Equation 12)
         a1_ucb_br_coord = np.argmax(U1upper @ s2)
         a2_ucb_br_coord = np.argmax(s1 @ U2upper)
         a1_exp_coords = cross_product(np.array([[a1_ucb_br_coord]]), a2supp[:, None])
@@ -82,7 +84,7 @@ def ucb_mne(beta, domain, M):
 
         pure_strategies = domain[np.array(final_idxs)]
 
-        # Select the strategy with the highest predictive variance to sample
+        # Select the strategy with the highest predictive variance to sample (line 5 in Algorithm 2)
         _, variances = models[0].posterior().predict_f(pure_strategies)  # (2, 1)
         sampled_pure_strategy = pure_strategies[np.argmax(np.squeeze(variances))]
 
@@ -124,7 +126,7 @@ def ucb_mne_noexplore(beta, domain, M):
         (s1, s2), (a1supp, a2supp) = get_strategies_and_support(mne, M, M)
 
         noreg_samples_coords = cross_product(a1supp[:, None], a2supp[:, None])
-        # Take the noreg sample with the highest uncertainty
+        # Select the strategy with the predictive variance to sample
         noreg_idxs = noreg_samples_coords[:, 0] * M + noreg_samples_coords[:, 1]  # (c,)
         noreg_ci_vals = ucb_funcs[0](domain[noreg_idxs]) - lcb_funcs[0](
             domain[noreg_idxs]

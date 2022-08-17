@@ -77,8 +77,6 @@ def bo_loop_mne(
     kernel,
     noise_variance,
     rng,
-    plot=False,
-    save_dir="",
 ):
     """
     Main Bayesian optimization loop for MNEs.
@@ -89,11 +87,7 @@ def bo_loop_mne(
     :param num_iters: int.
     :param kernel: GPflow kernel.
     :param noise_variance: float.
-    :param actions:
-    :param domain:
     :param rng:
-    :param plot: bool.
-    :param save_dir: str.
     :return: Final dataset, tuple (X, Y).
     """
     data = init_data
@@ -102,7 +96,6 @@ def bo_loop_mne(
     prev_successes = []
     start = process_time()
     for _ in trange(num_iters):
-        # print(f"prev_successes: {prev_successes}")
         models = create_models(
             num_agents=num_agents,
             data=data,
@@ -119,20 +112,5 @@ def bo_loop_mne(
     end = process_time()
     total_time = end - start
     sampled_strategies = np.array(sampled_strategies)
-    # if plot:
-    #     plot_models_2d(
-    #         models=models,
-    #         xlims=(0, 1),
-    #         ylims=(0, 1),
-    #         actions=actions,
-    #         domain=domain,
-    #         X=data[0][t : t + 1],
-    #         title=f"GPs iter {t}",
-    #         cmap="Spectral",
-    #         save=True,
-    #         save_dir=save_dir,
-    #         filename=f"gps_{t}",
-    #         show_plot=False,
-    #     )
 
     return reported_strategies, sampled_strategies, total_time

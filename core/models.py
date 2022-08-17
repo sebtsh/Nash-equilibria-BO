@@ -59,7 +59,6 @@ def create_mean_funcs(models):
     """
     Converts GP models into their posterior mean functions.
     :param models: List of N GPflow GPs.
-    :param beta: float.
     :return: List of Callables that take in an array of shape (n, dims) and return an array of shape (n, 1).
     """
     N = len(models)

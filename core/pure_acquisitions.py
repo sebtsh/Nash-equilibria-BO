@@ -1,8 +1,6 @@
 import numpy as np
-from scipy.stats import norm
 from statsmodels.sandbox.distributions.extras import mvnormcdf
 
-from core.pne import find_PNE_discrete
 from core.utils import (
     maximize_fn,
     maxmin_fn,
@@ -70,16 +68,17 @@ def get_acq_pure(
 def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mode):
     def acq(models, rng, args_dict):
         """
-        Returns 2 points to query next. First one is no-regret selection, second is exploring sample.
+        Algorithm 1. Returns reported strategy profile, and either the reported or exploring strategy profile to be
+        sampled.
         :param models: List of N GPflow GPs.
         :param rng:
         :param args_dict:
-        :return: array of shape (2, N).
+        :return:
         """
         N = len(agent_dims_bounds)
         ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
         samples = []
-        # Pick no-regret selection
+        # Compute reported strategy profile (line 3 of Algorithm 1)
         noreg_sample, _ = maxmin_fn(
             outer_funcs=ucb_funcs,
             inner_funcs=lcb_funcs,
@@ -92,7 +91,7 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mo
         )
         samples.append(noreg_sample)
 
-        # Pick exploring samples
+        # Compute exploring strategy profile (Equation 5)
         if mode == "DIRECT":
             exploring_max_mode = "DIRECT"
         else:
@@ -139,7 +138,7 @@ def ucb_pne(beta, bounds, agent_dims_bounds, mode, n_samples_outer, inner_max_mo
         samples.append(exploring_sample)
         strategies = np.array(samples)  # (2, dims)
 
-        # Select the strategy with the highest predictive variance to sample
+        # Select the strategy with the highest predictive variance to sample (line 4 of Algorithm 1)
         _, variances = models[0].posterior().predict_f(strategies)  # (2, 1)
         sampled_strategy = strategies[np.argmax(np.squeeze(variances))]
         reported_strategy = noreg_sample
@@ -162,7 +161,7 @@ def ucb_pne_noexplore(
         """
         N = len(agent_dims_bounds)
         ucb_funcs, lcb_funcs = create_ci_funcs(models=models, beta=beta)
-        # Pick no-regret selection
+        # Compute reported strategy profile (line 3 of Algorithm 1)
         noreg_sample, _ = maxmin_fn(
             outer_funcs=ucb_funcs,
             inner_funcs=lcb_funcs,
@@ -316,7 +315,7 @@ def BN(
 
 def compute_prob_eq_vals(X_idxs, models, domain, num_actions, response_dicts):
     """
-
+    Computes probability of equilibrium for points determined by X_idxs.
     :param X_idxs: domain indices we wish to compute these values on. Array of shape (b, ).
     :param models:
     :param domain:
@@ -381,9 +380,13 @@ def prob_eq(
     """
     Probability of Equilibrium acquisition from Picheny et. al. (2018). Requires a discretization of the continuous
     domain, and calculated response dicts.
-    :param response_dicts: list of N dicts. Each is a dictionary with keys that are the bytes of a length dims array,
-    and returns the idxs of domain that have the actions of all other agents except i the same.
     :param num_actions: int. WARNING: assumes all agents have the same num_actions.
+    :param bounds:
+    :param agent_dims_bounds:
+    :param mode:
+    :param n_samples_outer:
+    :param inner_max_mode:
+    :param agent_dims:
     :return: Array of shape (n,). The probability of equilibrium for each point in domain.
     """
     num_agents = len(agent_dims)

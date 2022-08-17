@@ -72,8 +72,8 @@ def sample_GP_prior_utilities(num_agents, kernel, bounds, num_points, rng):
 def gan_utilities(rng, gan_sigma, m=100):
     """
     WARNING: Only works with 2 agents.
-    :param bounds:
     :param rng:
+    :param gan_sigma:
     :return: List of Callables that take in an array of shape (n, 5) and return an array of shape (n, 1).
     """
     # True parameters

@@ -87,7 +87,6 @@ def create_response_dict(i, domain, domain_in_idxs, action_idxs):
     :param domain_in_idxs: array of shape (M ** N, num_agents). All strategy profiles expressed as indices of each
     agent's actions.
     :param action_idxs:
-    :param agent_dims_bounds: list of N tuples (start_dim, end_dim) for each agent.
     :return: dict.
     """
     _, N = domain.shape
