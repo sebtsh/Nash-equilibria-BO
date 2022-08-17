@@ -147,7 +147,6 @@ def main(
         kernel=kernel,
         noise_variance=noise_variance,
         rng=rng,
-        plot=False,
     )
     time_per_iter = total_time / num_iters
 
