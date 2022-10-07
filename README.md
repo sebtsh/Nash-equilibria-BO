@@ -1,7 +1,7 @@
-# No-regret Sample-efficient Bayesian Optimization for Solving General-sum Games with Unknown Utilities
+# No-regret Sample-efficient Bayesian Optimization for Finding Nash Equilibria with Unknown Utilities
 
-This code repository accompanies the paper "No-regret Sample-efficient Bayesian Optimization for Solving General-sum 
-Games with Unknown Utilities".
+This code repository accompanies the paper "No-regret Sample-efficient Bayesian Optimization for Finding Nash Equilibria 
+with Unknown Utilities".
 
 ## Requirements
 1. Linux machine (experiments were run on Ubuntu 20.04.4 LTS)

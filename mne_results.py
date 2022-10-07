@@ -45,7 +45,6 @@ def main(
     pickles_dir = base_dir + "pickles/"
 
     acquisitions = ["random_mne", "max_ent_mne", "ucb_mne_noexplore", "ucb_mne"]
-    x = np.arange(num_bo_iters)
     color_dict = {
         "ucb_mne_noexplore": "#26c485",
         "max_ent_mne": "#fbb13c",
@@ -59,12 +58,18 @@ def main(
         "random_mne": "Random",
     }
 
-    # Plot cumulative regret
+    # Plot simple regret
     fig, axs = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
 
     for acquisition in acquisitions:
         color = color_dict[acquisition]
-        all_cumu_regrets = np.zeros((num_seeds, num_bo_iters))
+
+        if utility_name in ["rand", "gan"]:
+            cutoff = num_bo_iters
+        else:
+            cutoff = 200
+
+        all_simple_regrets = np.zeros((num_seeds, cutoff))
         all_times = []
         for seed in range(num_seeds):
             filename = f"mne-{utility_name}-{acquisition}-seed{seed}.p"
@@ -77,91 +82,32 @@ def main(
                 args,
             ) = pickle.load(open(pickles_dir + filename, "rb"))
 
-            all_cumu_regrets[seed] = cumu_regret
+            all_simple_regrets[seed] = np.minimum.accumulate(sample_regret)[:cutoff]
             all_times.append(time_per_iter)
-        mean_cumu_regrets = np.mean(all_cumu_regrets, axis=0)
-        std_err_cumu_regrets = np.std(all_cumu_regrets, axis=0) / np.sqrt(num_seeds)
+        mean_simple_regrets = np.mean(all_simple_regrets, axis=0)
+        std_err_simple_regrets = np.std(all_simple_regrets, axis=0) / np.sqrt(num_seeds)
         acq_name = acq_name_dict[acquisition]
 
+        x = np.arange(cutoff)
         # Cumulative regret
-        axs.plot(x, mean_cumu_regrets, label=acq_name, color=color)
+        axs.plot(x, mean_simple_regrets, label=acq_name, color=color)
         axs.fill_between(
             x,
-            mean_cumu_regrets - std_err_cumu_regrets,
-            mean_cumu_regrets + std_err_cumu_regrets,
+            mean_simple_regrets - std_err_simple_regrets,
+            mean_simple_regrets + std_err_simple_regrets,
             alpha=0.2,
             color=color,
         )
         # axs[i].legend(fontsize=20)
         axs.set_xlabel("Iterations", size=text_size)
-        axs.set_ylabel("Cumu. mixed Nash regret", size=text_size)
+        axs.set_ylabel("Simple mixed Nash regret", size=text_size)
         axs.tick_params(labelsize=tick_size)
-        axs.legend(fontsize=text_size - 2, loc="lower left")
+        axs.legend(fontsize=text_size - 2, loc="upper right")
+        axs.set_yscale("log")
 
     fig.tight_layout()
     fig.savefig(
-        save_dir + f"mne-{utility_name}-cumu_regret.pdf",
-        dpi=dpi,
-        bbox_inches="tight",
-        format="pdf",
-    )
-
-    # Plot immediate regret
-    fig, axs = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
-    axs.set_yscale("log")
-
-    for acquisition in acquisitions:
-        color = color_dict[acquisition]
-        all_imm_regrets = np.zeros((num_seeds, num_bo_iters))
-        all_times = []
-        for seed in range(num_seeds):
-            filename = f"mne-{utility_name}-{acquisition}-seed{seed}.p"
-            (
-                reported_strategies,
-                sampled_strategies,
-                sample_regret,
-                cumu_regret,
-                time_per_iter,
-                args,
-            ) = pickle.load(open(pickles_dir + filename, "rb"))
-
-            all_imm_regrets[seed] = sample_regret
-            all_times.append(time_per_iter)
-        mean_imm_regrets = np.mean(all_imm_regrets, axis=0)
-        std_err_imm_regrets = np.std(all_imm_regrets, axis=0) / np.sqrt(num_seeds)
-        acq_name = acq_name_dict[acquisition]
-
-        # # Immediate regret
-        # axs.plot(x, mean_imm_regrets, label=acq_name, color=color)
-        # axs.fill_between(
-        #     x,
-        #     mean_imm_regrets - std_err_imm_regrets,
-        #     mean_imm_regrets + std_err_imm_regrets,
-        #     alpha=0.2,
-        #     color=color,
-        # )
-        # Immediate regret
-        axs.plot(x, smooth_curve(mean_imm_regrets), label=acq_name, color=color)
-        axs.fill_between(
-            x,
-            smooth_curve(mean_imm_regrets) - smooth_curve(std_err_imm_regrets),
-            smooth_curve(mean_imm_regrets) + smooth_curve(std_err_imm_regrets),
-            alpha=0.2,
-            color=color,
-        )
-        # axs[i].legend(fontsize=20)
-        axs.set_xlabel("Iterations", size=text_size)
-        axs.set_ylabel("Imm. mixed Nash regret", size=text_size)
-        axs.tick_params(labelsize=tick_size)
-        axs.legend(fontsize=text_size - 2, loc="lower left")
-
-        print(
-            f"{acquisition} all_times: {all_times}, mean: {np.mean(all_times)}, stderr: {np.std(all_times) / np.sqrt(num_seeds)}"
-        )
-
-    fig.tight_layout()
-    fig.savefig(
-        save_dir + f"mne-{utility_name}-imm_regret-smoothed.pdf",
+        save_dir + f"mne-{utility_name}-simple_regret.pdf",
         dpi=dpi,
         bbox_inches="tight",
         format="pdf",
