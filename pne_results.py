@@ -41,6 +41,7 @@ def main(
     figsize=(10, 6),
     dpi=200,
 ):
+    plt.rcParams['pdf.fonttype'] = 42
     text_size = 28
     tick_size = 20
     base_dir = "results/pne/" + utility_name + "/"
@@ -69,6 +70,8 @@ def main(
 
     # Plot simple regret of reported strategy profiles
     fig, axs = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
+    axs.grid(which='major')
+    axs.grid(which='minor', linestyle=":", alpha=0.3)
 
     for acquisition in acquisitions:
         color = color_dict[acquisition]
@@ -119,6 +122,8 @@ def main(
 
     # Plot simple regret of reported strategy profiles
     fig, axs = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
+    axs.grid(which='major')
+    axs.grid(which='minor', linestyle=":", alpha=0.3)
 
     for acquisition in acquisitions:
         color = color_dict[acquisition]
